@@ -10,10 +10,11 @@ dist/
 venv/
 .env
 
-# Tooling caches
+# Tooling caches and local lint state
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.impeccable/
 htmlcov/
 .coverage
 
