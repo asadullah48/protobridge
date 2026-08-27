@@ -261,6 +261,7 @@ protocol.
 |---|---|---|
 | `GOV-001` | high | Tool is outside the principal's role allowlist |
 | `GOV-002` | high | A2A skill is outside the principal's role allowlist |
+| `GOV-003` | critical | A write tool is invoked by a role outside `ROLE_WRITE_PERMISSION` |
 | `MCP-001` | critical | Peer negotiated an unsupported MCP protocol version |
 | `A2A-001` | high | Requested skill is not declared on the peer's Agent Card |
 | `A2A-002` | medium | Agent Card advertises a different A2A version than the bridge speaks |
@@ -277,8 +278,16 @@ protocol.
 | `PRO-003` | low | Failed result carries no error description |
 
 PII detection walks **field names** declared by the source protocol
-(`mcp.PII_FIELDS`), not value patterns — a national id formatted unusually
+(`rules.ALL_PII_FIELDS`, the union of `mcp.PII_FIELDS` and
+`crm.CRM_PII_FIELDS`), not value patterns — a national id formatted unusually
 would defeat a regex, and a regex would false-positive on ordinary numbers.
+
+Walking names rather than values is also what made the Twenty CRM integration
+free on the egress side: adding `primaryEmail`, `primaryPhoneNumber`, `city`
+and friends to that union governed every CRM response without a single rule
+changing. The write path was the part that genuinely needed a new rule
+(`GOV-003`), because before the CRM every tool was read-only and "allowlisted"
+therefore meant "may read".
 
 ---
 

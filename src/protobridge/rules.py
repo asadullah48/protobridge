@@ -19,6 +19,7 @@ from dataclasses import asdict, dataclass
 from enum import StrEnum
 from typing import Any
 
+from protobridge import crm as crm_proto
 from protobridge.envelope import (
     Classification,
     EnvelopeResult,
@@ -30,6 +31,15 @@ from protobridge.protocols import a2a as a2a_proto
 from protobridge.protocols import mcp as mcp_proto
 
 REDACTION_PLACEHOLDER = "[REDACTED]"
+
+ALL_PII_FIELDS = mcp_proto.PII_FIELDS | crm_proto.CRM_PII_FIELDS
+"""Every field name the audit layer treats as personally identifiable.
+
+Unioning the CRM's field names in here is the whole integration on the egress
+side: no rule changes, because the rules already walk field names rather than
+value patterns. A Twenty person record becomes governed the moment its field
+names are known.
+"""
 
 
 class Severity(StrEnum):
@@ -82,12 +92,29 @@ class Violation:
 # Policy configuration
 # --------------------------------------------------------------------------
 
+_BASE_TOOLS = frozenset({"fx.convert", "kb.search"})
+_CRM_READ_TOOLS = frozenset(
+    {"crm.person_search", "crm.person_get", "crm.company_search", "crm.opportunity_list"}
+)
+_CRM_ALL_TOOLS = _CRM_READ_TOOLS | crm_proto.WRITE_TOOLS
+
 ROLE_TOOL_ALLOWLIST: dict[str, frozenset[str]] = {
-    "agent": frozenset({"fx.convert", "kb.search"}),
-    "planner": frozenset({"fx.convert", "kb.search"}),
-    "hr-agent": frozenset({"fx.convert", "kb.search", "hr.employee_lookup"}),
-    "admin": frozenset({"fx.convert", "kb.search", "hr.employee_lookup"}),
+    "agent": _BASE_TOOLS,
+    "planner": _BASE_TOOLS,
+    "hr-agent": _BASE_TOOLS | {"hr.employee_lookup"},
+    "crm-agent": _BASE_TOOLS | _CRM_READ_TOOLS,
+    "crm-writer": _BASE_TOOLS | _CRM_ALL_TOOLS,
+    "admin": _BASE_TOOLS | {"hr.employee_lookup"} | _CRM_ALL_TOOLS,
 }
+
+ROLE_WRITE_PERMISSION: frozenset[str] = frozenset({"crm-writer", "admin"})
+"""Roles permitted to mutate an external system of record.
+
+Kept separate from the tool allowlist on purpose. Until the CRM arrived every
+tool was read-only, so "allowlisted" and "may read" were the same thing. They
+are not the same thing once a tool can write to a live customer record, and
+collapsing them would let a read grant become a write grant by accident.
+"""
 
 ROLE_SKILL_ALLOWLIST: dict[str, frozenset[str]] = {
     "agent": frozenset({"vendor.risk_assessment", "supply.lead_time_estimate"}),
@@ -123,6 +150,22 @@ def evaluate_ingress(
                         f"tool {env.subject!r}"
                     ),
                     remediation="add the tool to ROLE_TOOL_ALLOWLIST or use a privileged role",
+                    phase=Phase.INGRESS,
+                )
+            )
+        if env.subject in crm_proto.WRITE_TOOLS and env.principal.role not in ROLE_WRITE_PERMISSION:
+            violations.append(
+                Violation(
+                    code="GOV-003",
+                    severity=Severity.CRITICAL,
+                    message=(
+                        f"role {env.principal.role!r} may read but not write; "
+                        f"{env.subject!r} mutates a live customer record"
+                    ),
+                    remediation=(
+                        "grant a role in ROLE_WRITE_PERMISSION, or route the change "
+                        "through a human approval step"
+                    ),
                     phase=Phase.INGRESS,
                 )
             )
@@ -222,7 +265,7 @@ def evaluate_ingress(
 # --------------------------------------------------------------------------
 
 
-def find_pii_fields(payload: Any, fields: frozenset[str] = mcp_proto.PII_FIELDS) -> list[str]:
+def find_pii_fields(payload: Any, fields: frozenset[str] = ALL_PII_FIELDS) -> list[str]:
     """Recursively collect the names of PII-bearing fields present in a payload."""
     found: set[str] = set()
 
@@ -240,7 +283,7 @@ def find_pii_fields(payload: Any, fields: frozenset[str] = mcp_proto.PII_FIELDS)
     return sorted(found)
 
 
-def redact(payload: Any, fields: frozenset[str] = mcp_proto.PII_FIELDS) -> Any:
+def redact(payload: Any, fields: frozenset[str] = ALL_PII_FIELDS) -> Any:
     """Return a copy with every PII-bearing field replaced by a placeholder.
 
     Sensitivity is a property of the *field name* declared by the source

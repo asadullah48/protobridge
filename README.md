@@ -117,6 +117,65 @@ you cannot forget to call it.
 
 ---
 
+## Real integration: Twenty CRM as governed tools
+
+Synthetic fixtures only prove so much, so ProtoBridge ships an adapter for
+[Twenty](https://twenty.com), the open-source CRM. Contacts, companies, deals
+and notes become MCP tools routed through the same audit, redaction and
+allowlist layer:
+
+```bash
+uv run protobridge crm          # offline fixture, no keys needed
+uv run protobridge crm-tools    # the CRM tool catalogue
+uv run protobridge serve-crm    # point any MCP client at the CRM
+```
+
+Real output:
+
+```
+[1] Contact lookup by an under-cleared caller
+    verdict   : redact
+    findings  : SEC-001(high)
+    redacted  : city, primaryEmail, primaryPhoneNumber
+
+[4] Writing a note with a read-only role -> blocked
+    verdict   : block
+    findings  : GOV-001(high), GOV-003(critical)
+
+[5] Same write by a role holding write permission
+    verdict   : allow
+```
+
+**The egress integration needed no new rule.** The rules already walk *field
+names* rather than value patterns, so unioning Twenty's PII field names into
+`ALL_PII_FIELDS` was the entire change — a person record became governed the
+moment its field names were known.
+
+**The write path did need one.** Every tool before the CRM was read-only, so
+"allowlisted" and "may read" were the same thing. They stop being the same
+thing once a tool can mutate a live customer record, so write permission is a
+separate grant (`ROLE_WRITE_PERMISSION`) enforced by rule `GOV-003` at
+`critical` severity. Collapsing the two would let a read grant silently become
+a write grant.
+
+### Pointing it at a real workspace
+
+```bash
+export TWENTY_BASE_URL=https://crm.example.com
+export TWENTY_API_KEY=...          # Settings -> API & Webhooks
+uv run protobridge crm
+```
+
+With neither variable set the adapter uses a deterministic offline fixture, so
+the zero-key promise above still holds on a fresh clone.
+
+One caveat worth knowing: **Twenty has no static API reference.** Each
+workspace generates its own schema — add a custom object and it immediately
+gets REST endpoints beside the built-in ones. The adapter is therefore
+defensive about response shapes rather than assuming a fixed contract.
+
+---
+
 ## Design decisions worth knowing
 
 **One pivot type, not N² translators.** Every message is lifted into a

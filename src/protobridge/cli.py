@@ -1,10 +1,13 @@
 """Command-line entry point.
 
 protobridge demo          run the full interoperability scenario offline
+protobridge crm           run Twenty CRM tools through the governance layer
 protobridge graph         print the bridge graph as mermaid
 protobridge card          print the reference A2A Agent Card
 protobridge tools         list the reference MCP tool catalogue
+protobridge crm-tools     list the Twenty CRM tool catalogue
 protobridge serve-mcp     run the reference MCP server on stdio
+protobridge serve-crm     run the Twenty CRM MCP server on stdio
 protobridge serve-a2a     run the reference A2A agent over HTTP
 protobridge audit         run the scenario and verify the audit chain
 """
@@ -16,7 +19,7 @@ import json
 import sys
 from typing import Any
 
-from protobridge import __version__
+from protobridge import __version__, crm
 from protobridge.agents import A2AGateway, MCPConnector
 from protobridge.envelope import (
     Classification,
@@ -235,6 +238,101 @@ def cmd_serve_mcp(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_crm_tools(_args: argparse.Namespace) -> int:
+    print(json.dumps(crm.TOOL_SPECS, indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_serve_crm(_args: argparse.Namespace) -> int:
+    backend = crm.get_backend()
+    print(
+        f"protobridge Twenty CRM server ready on stdio (backend: {backend.name})",
+        file=sys.stderr,
+    )
+    crm.serve_stdio()
+    return 0
+
+
+def cmd_crm(args: argparse.Namespace) -> int:
+    """Twenty CRM routed through the governance layer."""
+    reasoner = get_reasoner(args.llm)
+    ledger = AuditLedger()
+    backend = crm.get_backend()
+
+    print(RULE)
+    print(f"ProtoBridge {__version__} - Twenty CRM as governed MCP tools")
+    print(f"  backend  : {backend.name}")
+    print(f"  reasoner : {reasoner.name}")
+    print(RULE)
+    if backend.name == "fake":
+        print("\nNo TWENTY_BASE_URL / TWENTY_API_KEY set, so this is the offline fixture.")
+        print("Set both to point these same tools at a real Twenty workspace.")
+
+    connector = MCPConnector(crm.InProcessTransport)
+    app = build_bridge(mcp_connector=connector, ledger=ledger, reasoner=reasoner)
+
+    reader = Principal(subject="svc:sales-copilot", role="crm-agent", tenant="acme")
+    cleared = Principal(
+        subject="svc:crm-admin",
+        role="crm-agent",
+        tenant="acme",
+        clearance=Classification.RESTRICTED,
+    )
+    writer = Principal(subject="svc:crm-writer", role="crm-writer", tenant="acme")
+    outsider = Principal(subject="svc:planner", role="planner", tenant="acme")
+
+    def envelope(subject: str, payload: dict[str, Any], principal: Principal) -> ProtocolEnvelope:
+        return ProtocolEnvelope(
+            target=Protocol.MCP,
+            intent=Intent.TOOL_INVOKE,
+            subject=subject,
+            payload=payload,
+            principal=principal,
+        )
+
+    note = {"title": "Call summary", "body": "Discussed renewal."}
+    scenarios = [
+        (
+            "Contact lookup by an under-cleared caller",
+            envelope("crm.person_search", {"query": "Nadia"}, reader),
+        ),
+        (
+            "Same lookup by a caller cleared for restricted data",
+            envelope("crm.person_search", {"query": "Nadia"}, cleared),
+        ),
+        (
+            "Company firmographics - not personal data",
+            envelope("crm.company_search", {"query": "Acme"}, reader),
+        ),
+        (
+            "Writing a note with a read-only role -> blocked",
+            envelope("crm.note_create", note, reader),
+        ),
+        (
+            "Same write by a role holding write permission",
+            envelope("crm.note_create", note, writer),
+        ),
+        (
+            "A role with no CRM grant at all",
+            envelope("crm.person_search", {"query": "Nadia"}, outsider),
+        ),
+    ]
+
+    for index, (title, env) in enumerate(scenarios, start=1):
+        _print_scenario(index, title, run_envelope(app, env))
+
+    connector.close()
+
+    status = ledger.verify()
+    chain = "INTACT" if status.valid else f"BROKEN at entry {status.broken_at}"
+    print(f"\n{RULE}")
+    print("audit ledger")
+    print(f"  entries    : {len(ledger)}")
+    print(f"  chain      : {chain}")
+    print(RULE)
+    return 0
+
+
 def cmd_serve_a2a(args: argparse.Namespace) -> int:
     server = a2a_proto.make_server(args.host, args.port)
     host, port = server.server_address[0], server.server_address[1]
@@ -286,6 +384,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub.add_parser("serve-mcp", help="run the reference MCP server on stdio").set_defaults(
         func=cmd_serve_mcp
+    )
+
+    crm_demo = sub.add_parser("crm", help="run Twenty CRM tools through the governance layer")
+    crm_demo.add_argument("--llm", default=None, choices=["deterministic", "ollama"])
+    crm_demo.set_defaults(func=cmd_crm)
+
+    sub.add_parser("crm-tools", help="print the Twenty CRM tool catalogue").set_defaults(
+        func=cmd_crm_tools
+    )
+    sub.add_parser("serve-crm", help="run the Twenty CRM MCP server on stdio").set_defaults(
+        func=cmd_serve_crm
     )
 
     serve_a2a = sub.add_parser("serve-a2a", help="run the reference A2A agent over HTTP")
