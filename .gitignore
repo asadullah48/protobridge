@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Environments
+.venv/
+venv/
+.env
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Generated audit exports - these carry payload digests, so never commit them.
+protobridge-audit.jsonl
+*.audit.jsonl
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
