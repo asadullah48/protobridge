@@ -563,6 +563,7 @@ footer { border-top: 1px solid var(--edge); padding: 44px 0 60px; }
   var RULES = [
     ["GOV-001", "ingress", "high",     "Tool sits outside the caller's role allowlist"],
     ["GOV-002", "ingress", "high",     "A2A skill sits outside the caller's role allowlist"],
+    ["GOV-003", "ingress", "critical", "A write tool mutates a record for a role without write permission"],
     ["MCP-001", "ingress", "critical", "Peer negotiated an unsupported MCP protocol version"],
     ["A2A-001", "ingress", "high",     "Requested skill is not declared on the peer's Agent Card"],
     ["A2A-002", "ingress", "medium",   "Agent Card advertises a different A2A version than the bridge speaks"],
