@@ -8,7 +8,10 @@ is on the other side, and without losing the compliance signal at the boundary.
 
 Runs entirely offline. No API keys, no accounts, no cloud egress.
 
-*[العربية](./README.ar.md) · [Full specification](./SPEC.md)*
+**[▶ Live interactive demo](https://asadullah48.github.io/protobridge/)** — inspect real traces and verify the
+audit chain with SHA-256 in your own browser.
+
+*[العربية](./README.ar.md) · [Full specification](./SPEC.md) · [Portfolio](https://asadullahshafique-devunity.vercel.app)*
 
 ---
 

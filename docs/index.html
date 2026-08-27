@@ -1,0 +1,836 @@
+<title>ProtoBridge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+/* ---------- tokens: light is the base, both dark states override ---------- */
+:root {
+  --ground:      #E9EDEF;
+  --surface:     #F4F7F8;
+  --surface-alt: #DFE6E9;
+  --edge:        #C3CFD4;
+  --edge-soft:   #D6DFE3;
+  --text:        #0A171E;
+  --text-dim:    #46606B;
+  --text-faint:  #6E858E;
+  --wire:        #12808C;
+  --wire-soft:   rgba(18, 128, 140, 0.10);
+  --allow:       #2F8560;
+  --redact:      #A8701A;
+  --block:       #B23F3B;
+  --stamp-shade: rgba(10, 23, 30, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0A171E;
+    --surface:     #0F212B;
+    --surface-alt: #16303C;
+    --edge:        #24454F;
+    --edge-soft:   #1A353F;
+    --text:        #E4EDF0;
+    --text-dim:    #9BB2BB;
+    --text-faint:  #6E8B96;
+    --wire:        #2BB3C0;
+    --wire-soft:   rgba(43, 179, 192, 0.12);
+    --allow:       #47B383;
+    --redact:      #E0A33F;
+    --block:       #E0645E;
+    --stamp-shade: rgba(228, 237, 240, 0.05);
+  }
+}
+:root[data-theme="dark"] {
+  --ground:      #0A171E;
+  --surface:     #0F212B;
+  --surface-alt: #16303C;
+  --edge:        #24454F;
+  --edge-soft:   #1A353F;
+  --text:        #E4EDF0;
+  --text-dim:    #9BB2BB;
+  --text-faint:  #6E8B96;
+  --wire:        #2BB3C0;
+  --wire-soft:   rgba(43, 179, 192, 0.12);
+  --allow:       #47B383;
+  --redact:      #E0A33F;
+  --block:       #E0645E;
+  --stamp-shade: rgba(228, 237, 240, 0.05);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: "Zilla Slab", Georgia, serif;
+  font-weight: 700;
+  text-wrap: balance;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+a { color: var(--wire); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+
+:focus-visible {
+  outline: 2px solid var(--wire);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.shell { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+.eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* ---------- the seam: structural spine of the page ---------- */
+.seam {
+  position: fixed;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--edge-soft) 12%, var(--edge-soft) 88%, transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+@media (max-width: 900px) { .seam { display: none; } }
+
+main, header, footer { position: relative; z-index: 1; }
+
+/* ---------- header ---------- */
+.topbar {
+  border-bottom: 1px solid var(--edge-soft);
+  background: var(--ground);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.topbar-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 24px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+.brand {
+  font-family: "Zilla Slab", Georgia, serif;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.brand-mark {
+  width: 11px; height: 11px;
+  border: 2px solid var(--wire);
+  border-radius: 50%;
+  flex: none;
+}
+.topnav { display: flex; gap: 20px; align-items: center; font-size: 14px; }
+.topnav a { color: var(--text-dim); text-decoration: none; }
+.topnav a:hover { color: var(--wire); }
+@media (max-width: 720px) { .topnav .opt { display: none; } }
+
+/* ---------- hero ---------- */
+.hero { padding: 76px 0 60px; }
+.hero h1 { font-size: clamp(40px, 7vw, 76px); line-height: 1.02; margin: 14px 0 0; }
+.hero .lede {
+  font-size: clamp(17px, 2.1vw, 20px);
+  color: var(--text-dim);
+  max-width: 62ch;
+  margin: 22px 0 0;
+}
+.hero .lede strong { color: var(--text); font-weight: 600; }
+
+.territories {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: stretch;
+  margin-top: 52px;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.terr { padding: 22px 24px; display: flex; flex-direction: column; gap: 7px; }
+.terr h3 { font-size: 17px; }
+.terr p { margin: 0; font-size: 14px; color: var(--text-dim); }
+.terr .spec { font-size: 12.5px; color: var(--text-faint); }
+.checkpoint {
+  border-left: 1px solid var(--edge);
+  border-right: 1px solid var(--edge);
+  background: var(--surface-alt);
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  min-width: 176px;
+}
+.checkpoint .name { font-family: "Zilla Slab", Georgia, serif; font-weight: 700; font-size: 15px; }
+.checkpoint .sub { font-size: 12px; color: var(--text-dim); line-height: 1.4; }
+@media (max-width: 860px) {
+  .territories { grid-template-columns: 1fr; }
+  .checkpoint { border-left: 0; border-right: 0; border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
+}
+
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  margin-top: 34px;
+  padding-top: 26px;
+  border-top: 1px solid var(--edge-soft);
+}
+.metric .n {
+  font-family: "Zilla Slab", Georgia, serif;
+  font-weight: 700;
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.metric .l { font-size: 12.5px; color: var(--text-faint); margin-top: 5px; }
+
+/* ---------- sections ---------- */
+section { padding: 64px 0; border-top: 1px solid var(--edge-soft); }
+.sec-head { max-width: 66ch; margin-bottom: 32px; }
+.sec-head h2 { font-size: clamp(26px, 3.6vw, 36px); margin-top: 10px; }
+.sec-head p { color: var(--text-dim); margin: 14px 0 0; }
+
+/* ---------- inspector ---------- */
+.scenarios { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
+.scn {
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 13px;
+  border: 1px solid var(--edge);
+  background: var(--surface);
+  color: var(--text-dim);
+  border-radius: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.scn:hover { border-color: var(--wire); color: var(--text); }
+.scn[aria-pressed="true"] { background: var(--wire-soft); border-color: var(--wire); color: var(--text); font-weight: 500; }
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.dot.allow { background: var(--allow); }
+.dot.redact { background: var(--redact); }
+.dot.block { background: var(--block); }
+
+.pipe {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  background: var(--surface);
+  overflow-x: auto;
+  padding: 18px;
+  margin-bottom: 22px;
+}
+.node {
+  flex: 1 1 0;
+  min-width: 132px;
+  padding: 13px 14px;
+  border: 1px solid var(--edge-soft);
+  border-radius: 2px;
+  background: var(--ground);
+  transition: border-color .3s, box-shadow .3s;
+}
+.node.on { border-color: var(--wire); box-shadow: 0 0 0 1px var(--wire-soft); }
+.node.on.verdict-block { border-color: var(--block); }
+.node .nm { font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 500; }
+.node .rl { font-size: 11.5px; color: var(--text-faint); margin-top: 3px; }
+.arrow { align-self: center; padding: 0 9px; color: var(--text-faint); flex: none; font-size: 13px; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 880px) { .grid2 { grid-template-columns: 1fr; } }
+
+.panel {
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  background: var(--surface);
+  padding: 18px;
+  min-width: 0;
+}
+.panel h3 {
+  font-size: 13px;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 500;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 12px;
+}
+
+pre.json {
+  margin: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-dim);
+  overflow-x: auto;
+  white-space: pre;
+}
+pre.json .k { color: var(--text); }
+pre.json .s { color: var(--wire); }
+pre.json .n { color: var(--allow); }
+pre.json .red { color: var(--block); font-weight: 500; background: var(--stamp-shade); padding: 0 3px; }
+
+.verdict-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.stamp {
+  font-family: "Zilla Slab", Georgia, serif;
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 7px 16px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  transform: rotate(-2.2deg);
+  display: inline-block;
+}
+.stamp.allow { color: var(--allow); }
+.stamp.redact { color: var(--redact); }
+.stamp.block { color: var(--block); }
+.latency { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+.finding { border-left: 3px solid var(--edge); padding: 9px 0 9px 13px; margin-bottom: 11px; }
+.finding.high, .finding.critical { border-left-color: var(--block); }
+.finding.medium { border-left-color: var(--redact); }
+.finding .code { font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 500; }
+.sev {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 2px;
+  margin-left: 8px;
+  background: var(--stamp-shade);
+  color: var(--text-dim);
+}
+.finding .msg { font-size: 13px; color: var(--text-dim); margin-top: 5px; }
+.finding .fix { font-size: 12.5px; color: var(--text-faint); margin-top: 5px; }
+.clean { font-size: 13.5px; color: var(--text-faint); margin: 0; }
+.narr { font-size: 13.5px; color: var(--text-dim); border-top: 1px solid var(--edge-soft); padding-top: 13px; margin-top: 14px; }
+
+/* ---------- tables ---------- */
+.tablewrap { overflow-x: auto; border: 1px solid var(--edge); border-radius: 3px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--surface); }
+th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--edge-soft); vertical-align: top; }
+thead th {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 500;
+}
+tbody tr:last-child td { border-bottom: 0; }
+td:first-child { width: 22%; }
+.rule-code { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; font-weight: 500; }
+td.phase, td.sev-cell { color: var(--text-faint); font-size: 13px; }
+
+/* ---------- ledger ---------- */
+.chain { display: flex; flex-direction: column; }
+.ledger-entry {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 11px 15px;
+  border: 1px solid var(--edge);
+  background: var(--surface);
+  border-radius: 2px;
+  transition: border-color .2s, background .2s;
+}
+.ledger-entry + .ledger-entry { margin-top: -1px; }
+.ledger-entry.broken { border-color: var(--block); position: relative; z-index: 2; }
+.ledger-entry.orphan { border-color: var(--redact); position: relative; z-index: 1; }
+.blk-seq { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.blk-ev { font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+.blk-meta { font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
+.blk-hash { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--text-faint); text-align: right; }
+.blk-state { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .06em; text-align: right; margin-top: 2px; }
+.blk-state.ok { color: var(--allow); }
+.blk-state.bad { color: var(--block); }
+.blk-state.warn { color: var(--redact); }
+
+.controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; align-items: center; }
+.btn {
+  font: inherit;
+  font-size: 13.5px;
+  padding: 9px 16px;
+  border-radius: 2px;
+  border: 1px solid var(--wire);
+  background: var(--wire);
+  color: var(--ground);
+  cursor: pointer;
+  font-weight: 500;
+}
+.btn.ghost { background: transparent; color: var(--text-dim); border-color: var(--edge); }
+.btn.ghost:hover:not(:disabled) { border-color: var(--wire); color: var(--wire); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.chain-status { font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+.chain-status.ok { color: var(--allow); }
+.chain-status.bad { color: var(--block); }
+
+/* ---------- footer ---------- */
+footer { border-top: 1px solid var(--edge); padding: 44px 0 60px; }
+.foot { display: flex; justify-content: space-between; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+.foot p { margin: 0; font-size: 13.5px; color: var(--text-faint); max-width: 46ch; }
+.footlinks { display: flex; gap: 22px; flex-wrap: wrap; font-size: 14px; }
+
+.note { font-size: 12.5px; color: var(--text-faint); margin-top: 16px; max-width: 74ch; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+
+<div class="seam" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span> ProtoBridge</div>
+    <nav class="topnav">
+      <a href="#inspect">Inspector</a>
+      <a href="#rules" class="opt">Rules</a>
+      <a href="#ledger">Ledger</a>
+      <a href="https://github.com/asadullah48/protobridge">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="shell">
+
+  <div class="hero">
+    <div class="eyebrow">MCP &times; A2A &middot; interoperability layer</div>
+    <h1>A customs house for machine messages.</h1>
+    <p class="lede">Two agent protocols. One governed crossing. ProtoBridge speaks Anthropic&rsquo;s
+      <strong>Model Context Protocol</strong> and Google&rsquo;s <strong>Agent2Agent</strong> through a single
+      pipeline &mdash; then inspects, redacts, or refuses every message that crosses, sealing each decision
+      into a tamper-evident chain.</p>
+
+    <div class="territories">
+      <div class="terr">
+        <div class="eyebrow">Territory west</div>
+        <h3>MCP &mdash; tools you host</h3>
+        <p>JSON-RPC 2.0 over <em>stdio</em>. You spawned the process, so the question is &ldquo;what tools do you have?&rdquo;</p>
+        <div class="spec mono">initialize &rarr; tools/list &rarr; tools/call</div>
+      </div>
+      <div class="checkpoint">
+        <div class="eyebrow">Checkpoint</div>
+        <div class="name">AuditAgent</div>
+        <div class="sub">Inspects on the way out<br>and on the way back</div>
+      </div>
+      <div class="terr">
+        <div class="eyebrow">Territory east</div>
+        <h3>A2A &mdash; agents you don&rsquo;t own</h3>
+        <p>JSON-RPC 2.0 over <em>HTTP</em>. A peer across a company boundary, so the question is &ldquo;who are you?&rdquo;</p>
+        <div class="spec mono">/.well-known/agent.json &rarr; message/send</div>
+      </div>
+    </div>
+
+    <div class="metrics">
+      <div class="metric"><div class="n" id="m-scn">6</div><div class="l">real traces, captured live</div></div>
+      <div class="metric"><div class="n" id="m-rules">11</div><div class="l">compliance rules</div></div>
+      <div class="metric"><div class="n" id="m-ledger">10</div><div class="l">chained ledger entries</div></div>
+      <div class="metric"><div class="n">41</div><div class="l">tests passing</div></div>
+      <div class="metric"><div class="n">0</div><div class="l">API keys required</div></div>
+    </div>
+  </div>
+
+  <section id="inspect">
+    <div class="sec-head">
+      <div class="eyebrow">Trace inspector</div>
+      <h2>Watch a request get inspected.</h2>
+      <p>Every trace below came out of the running system &mdash; a real MCP server in a subprocess and a real
+        A2A agent over HTTP. None of it is mocked. Pick a crossing and follow it through the checkpoint.</p>
+    </div>
+
+    <div class="scenarios" id="scenarios" role="group" aria-label="Choose a trace"></div>
+
+    <div class="pipe" id="pipe"></div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h3>Envelope in</h3>
+        <pre class="json" id="env-json"></pre>
+      </div>
+      <div class="panel">
+        <h3>Response out</h3>
+        <div class="verdict-row">
+          <span class="stamp" id="stamp">&mdash;</span>
+          <span class="latency" id="latency"></span>
+        </div>
+        <pre class="json" id="res-json"></pre>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px">
+      <h3>Findings</h3>
+      <div id="findings"></div>
+      <div class="narr" id="narrative"></div>
+    </div>
+  </section>
+
+  <section id="rules">
+    <div class="sec-head">
+      <div class="eyebrow">Policy</div>
+      <h2>Rules report facts. One function decides.</h2>
+      <p>Checks are grouped by <em>phase</em>, not by protocol &mdash; because a PII leak is invisible on the way
+        out. You only learn the response carried a national ID after the tool has already returned it.</p>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Code</th><th>Phase</th><th>Severity</th><th>Fires when</th></tr></thead>
+        <tbody id="rules-body"></tbody>
+      </table>
+    </div>
+    <p class="note">Enforcement lives in a single function marked <code>=== POLICY SEAM ===</code>. The default is
+      asymmetric: ingress is fail-closed, because nothing has left the building yet and blocking is cheap. Egress
+      prefers redaction, because the expensive work is already paid for and the caller usually needs the rest.</p>
+  </section>
+
+  <section id="ledger">
+    <div class="sec-head">
+      <div class="eyebrow">Tamper-evident ledger</div>
+      <h2>Verify the chain yourself.</h2>
+      <p>Each entry hashes over the previous entry&rsquo;s hash. Your browser recomputes all ten SHA-256 digests
+        below with the Web Crypto API and compares them to what Python wrote. Break one and the damage propagates.</p>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="verify" type="button">Verify chain</button>
+      <button class="btn ghost" id="tamper" type="button">Tamper with entry 03</button>
+      <button class="btn ghost" id="restore" type="button" disabled>Restore</button>
+      <span class="chain-status" id="chain-status" role="status"></span>
+    </div>
+
+    <div class="chain" id="chain"></div>
+
+    <p class="note">The chain covers a payload <em>digest</em>, never the payload &mdash; so the integrity proof
+      survives even when policy required the sensitive bytes be dropped. You keep provability without retaining PII.</p>
+  </section>
+
+</div>
+</main>
+
+<footer>
+  <div class="shell foot">
+    <p>ProtoBridge is a reference implementation: Python, LangGraph, and two protocol adapters written to the wire.
+      All tool and vendor data is synthetic.</p>
+    <div class="footlinks">
+      <a href="https://github.com/asadullah48/protobridge">Source</a>
+      <a href="https://github.com/asadullah48/protobridge/blob/main/SPEC.md">Specification</a>
+      <a href="https://asadullahshafique-devunity.vercel.app">Asadullah Shafique &rarr; Portfolio</a>
+    </div>
+  </div>
+</footer>
+
+<script id="trace-data" type="application/json">{"scenarios":[{"title":"Permitted tool call","blurb":"fx.convert via MCP by an allow-listed role.","envelope":{"trace_id":"trc_eb0de8d864e3","target":"mcp","intent":"tool.invoke","subject":"fx.convert","payload":{"amount":250,"from":"USD","to":"PKR"},"classification":"internal","principal":{"subject":"svc:planner","role":"planner","clearance":"internal","crosses_vendor_boundary":false}},"route":"mcp","verdict":"allow","violations":[],"redacted_fields":[],"narrative":"MCP call to 'fx.convert' completed cleanly; no policy findings.","result":{"ok":true,"content":{"amount":250.0,"from":"USD","to":"PKR","rate":278.5,"converted":69625.0},"error":null,"classification":"public","latency_ms":0.33}},{"title":"PII redaction at egress","blurb":"Caller may invoke the tool, but not see every field it returns.","envelope":{"trace_id":"trc_34ef57d60b59","target":"mcp","intent":"tool.invoke","subject":"hr.employee_lookup","payload":{"employee_id":"E-1001"},"classification":"internal","principal":{"subject":"svc:hr","role":"hr-agent","clearance":"internal","crosses_vendor_boundary":false}},"route":"mcp","verdict":"redact","violations":[{"code":"SEC-001","severity":"high","message":"response exposes PII fields ['email', 'national_id', 'salary_band'] at classification restricted, above principal clearance internal","remediation":"redact the fields or raise the principal's clearance","phase":"egress"}],"redacted_fields":["email","national_id","salary_band"],"narrative":"MCP call to 'hr.employee_lookup' was allowed after redacting sensitive fields. 1 finding(s) [SEC-001]; most severe high: response exposes PII fields ['email', 'national_id', 'salary_band'] at classification restricted, above principal clearance internal Remediation: redact the fields or raise the principal's clearance.","result":{"ok":true,"content":{"record":{"employee_id":"E-1001","name":"Ada Lovelace","email":"[REDACTED]","national_id":"[REDACTED]","salary_band":"[REDACTED]","department":"Platform Engineering"}},"error":null,"classification":"restricted","latency_ms":0.06}},{"title":"Blocked at ingress","blurb":"Tool sits outside the caller's role allowlist, so it never dispatches.","envelope":{"trace_id":"trc_eb28855db06a","target":"mcp","intent":"tool.invoke","subject":"hr.employee_lookup","payload":{"employee_id":"E-1002"},"classification":"internal","principal":{"subject":"svc:planner","role":"planner","clearance":"internal","crosses_vendor_boundary":false}},"route":"blocked","verdict":"block","violations":[{"code":"GOV-001","severity":"high","message":"role 'planner' is not permitted to invoke tool 'hr.employee_lookup'","remediation":"add the tool to ROLE_TOOL_ALLOWLIST or use a privileged role","phase":"ingress"}],"redacted_fields":[],"narrative":"MCP call to 'hr.employee_lookup' was blocked. 1 finding(s) [GOV-001]; most severe high: role 'planner' is not permitted to invoke tool 'hr.employee_lookup' Remediation: add the tool to ROLE_TOOL_ALLOWLIST or use a privileged role.","result":{"ok":false,"content":{},"error":"blocked at ingress by AuditAgent: GOV-001","classification":"internal","latency_ms":0.0}},{"title":"Cross-vendor delegation","blurb":"Task handed to an agent operated by another company.","envelope":{"trace_id":"trc_e09b7d68c724","target":"a2a","intent":"agent.delegate","subject":"vendor.risk_assessment","payload":{"text":"Assess risk for globex-freight"},"classification":"internal","principal":{"subject":"svc:planner","role":"planner","clearance":"internal","crosses_vendor_boundary":false}},"route":"a2a","verdict":"allow","violations":[],"redacted_fields":[],"narrative":"A2A call to 'vendor.risk_assessment' completed cleanly; no policy findings.","result":{"ok":true,"content":{"skill":"vendor.risk_assessment","vendor":"globex-freight","risk_score":0.58,"tier":"medium","assessed_at":"2026-08-27T03:13:19.876222+00:00"},"error":null,"classification":"internal","latency_ms":2.49}},{"title":"Restricted data stopped at the boundary","blurb":"Regulated payload attempting to cross a vendor boundary.","envelope":{"trace_id":"trc_0064222a19a7","target":"a2a","intent":"agent.delegate","subject":"vendor.risk_assessment","payload":{"text":"Assess risk for initech-supply"},"classification":"restricted","principal":{"subject":"svc:procurement","role":"planner","clearance":"internal","crosses_vendor_boundary":true}},"route":"blocked","verdict":"block","violations":[{"code":"SEC-002","severity":"critical","message":"restricted-classification payload is being sent to an agent operated by another vendor","remediation":"execute a data processing addendum or downgrade the payload","phase":"ingress"}],"redacted_fields":[],"narrative":"A2A call to 'vendor.risk_assessment' was blocked. 1 finding(s) [SEC-002]; most severe critical: restricted-classification payload is being sent to an agent operated by another vendor Remediation: execute a data processing addendum or downgrade the payload.","result":{"ok":false,"content":{},"error":"blocked at ingress by AuditAgent: SEC-002","classification":"internal","latency_ms":0.0}},{"title":"Second declared skill","blurb":"Lead-time estimate from the same peer's Agent Card.","envelope":{"trace_id":"trc_276a45817064","target":"a2a","intent":"agent.delegate","subject":"supply.lead_time_estimate","payload":{"text":"Lead time for acme-logistics"},"classification":"internal","principal":{"subject":"svc:planner","role":"planner","clearance":"internal","crosses_vendor_boundary":false}},"route":"a2a","verdict":"allow","violations":[],"redacted_fields":[],"narrative":"A2A call to 'supply.lead_time_estimate' completed cleanly; no policy findings.","result":{"ok":true,"content":{"skill":"supply.lead_time_estimate","vendor":"acme-logistics","lead_time_days":12,"assessed_at":"2026-08-27T03:13:19.882112+00:00"},"error":null,"classification":"internal","latency_ms":2.03}}],"ledger":[{"seq":0,"ts":"2026-08-27T03:13:19.865794+00:00","event":"mcp.ingress","trace_id":"trc_eb0de8d864e3","actor":"svc:planner","payload_digest":"704ee5b66cb1200bff252d097ed456c93f8f588c31d11da0d441321d1daf3c59","prev_hash":"0000000000000000000000000000000000000000000000000000000000000000","entry_hash":"eed8a21f98ec2772971f455b1c5bd452c8a1659ad2c9c14c0cdcb9c3304d8267","detail":{"subject":"fx.convert","intent":"tool.invoke","verdict":"allow","violations":[]}},{"seq":1,"ts":"2026-08-27T03:13:19.867895+00:00","event":"mcp.egress","trace_id":"trc_eb0de8d864e3","actor":"svc:planner","payload_digest":"bab5a846b6c005bae6729a952afd535fe29f1cd0d4a6e4c039b28b5920a16999","prev_hash":"eed8a21f98ec2772971f455b1c5bd452c8a1659ad2c9c14c0cdcb9c3304d8267","entry_hash":"1add46eebc487538576630085f5e74ad87443ab7c8abf9a3a9aa91ac484fac5b","detail":{"subject":"fx.convert","verdict":"allow","violations":[],"redacted_fields":[],"classification":"public","latency_ms":0.335}},{"seq":2,"ts":"2026-08-27T03:13:19.869276+00:00","event":"mcp.ingress","trace_id":"trc_34ef57d60b59","actor":"svc:hr","payload_digest":"d1de849cc46f347fb5158cebef6c52e7bb37dda831a373ce0595c422a445a017","prev_hash":"1add46eebc487538576630085f5e74ad87443ab7c8abf9a3a9aa91ac484fac5b","entry_hash":"6172454292b8ab357e5cf00706cbad986d1be04033cfa7f619db03d202dac3d5","detail":{"subject":"hr.employee_lookup","intent":"tool.invoke","verdict":"allow","violations":[]}},{"seq":3,"ts":"2026-08-27T03:13:19.870349+00:00","event":"mcp.egress","trace_id":"trc_34ef57d60b59","actor":"svc:hr","payload_digest":"ab77dcba42d2897f37fb3e4b6a6508efb7186ebacbbf41b35f435f0f4abc1d8c","prev_hash":"6172454292b8ab357e5cf00706cbad986d1be04033cfa7f619db03d202dac3d5","entry_hash":"a51d94821815557d7b2dd0244fc6f7ff1697d922f45d8deb03db8289f992289e","detail":{"subject":"hr.employee_lookup","verdict":"redact","violations":["SEC-001"],"redacted_fields":["email","national_id","salary_band"],"classification":"restricted","latency_ms":0.057}},{"seq":4,"ts":"2026-08-27T03:13:19.871775+00:00","event":"mcp.ingress","trace_id":"trc_eb28855db06a","actor":"svc:planner","payload_digest":"c0e0a418be000dc4032b6e092e2fb7600afa144e5064f2409c79aa920291649a","prev_hash":"a51d94821815557d7b2dd0244fc6f7ff1697d922f45d8deb03db8289f992289e","entry_hash":"92393c5c5d0f2638747d1a8bbffed788a67f4f1b28e62948a87470fc146dd74f","detail":{"subject":"hr.employee_lookup","intent":"tool.invoke","verdict":"block","violations":["GOV-001"]}},{"seq":5,"ts":"2026-08-27T03:13:19.873717+00:00","event":"a2a.ingress","trace_id":"trc_e09b7d68c724","actor":"svc:planner","payload_digest":"2576543b84712e6400dafed242a4906f734b99ebdfbd41f6c1c092a57325113f","prev_hash":"92393c5c5d0f2638747d1a8bbffed788a67f4f1b28e62948a87470fc146dd74f","entry_hash":"4c3a44c4c26e82fe36949ec439b6c838c2598f470ecbf3ab005e89995ecc5a91","detail":{"subject":"vendor.risk_assessment","intent":"agent.delegate","verdict":"allow","violations":[]}},{"seq":6,"ts":"2026-08-27T03:13:19.877288+00:00","event":"a2a.egress","trace_id":"trc_e09b7d68c724","actor":"svc:planner","payload_digest":"ed6e58434c2706a8d28c5bb31c9618f829c3792976bb69aefafd584bef53ea73","prev_hash":"4c3a44c4c26e82fe36949ec439b6c838c2598f470ecbf3ab005e89995ecc5a91","entry_hash":"509f8f1ab93fdabb6c02130783e1922eeb1ba65bd4a67af547fb7efc470fc877","detail":{"subject":"vendor.risk_assessment","verdict":"allow","violations":[],"redacted_fields":[],"classification":"internal","latency_ms":2.493}},{"seq":7,"ts":"2026-08-27T03:13:19.878414+00:00","event":"a2a.ingress","trace_id":"trc_0064222a19a7","actor":"svc:procurement","payload_digest":"907c767d885c596225c016772f82078e2869bc0428142fe6475c0454b1bc10b2","prev_hash":"509f8f1ab93fdabb6c02130783e1922eeb1ba65bd4a67af547fb7efc470fc877","entry_hash":"b00142043bbbba23b3cca7b4b2bbe90bbd26dba734e8f03cf78036329bd7312a","detail":{"subject":"vendor.risk_assessment","intent":"agent.delegate","verdict":"block","violations":["SEC-002"]}},{"seq":8,"ts":"2026-08-27T03:13:19.879953+00:00","event":"a2a.ingress","trace_id":"trc_276a45817064","actor":"svc:planner","payload_digest":"afbac9b05c31e694c751461ee9fc6992acf5b48ceb10843eb963a4b936da9b97","prev_hash":"b00142043bbbba23b3cca7b4b2bbe90bbd26dba734e8f03cf78036329bd7312a","entry_hash":"176b75628471338a71b554d14a5b7990b9e409961a0800c8e0b66ab80b8c419c","detail":{"subject":"supply.lead_time_estimate","intent":"agent.delegate","verdict":"allow","violations":[]}},{"seq":9,"ts":"2026-08-27T03:13:19.883106+00:00","event":"a2a.egress","trace_id":"trc_276a45817064","actor":"svc:planner","payload_digest":"adf56be3707f0faeea1d5743d4dd56dd69cf92bbce8dce9d7d6054424a96448a","prev_hash":"176b75628471338a71b554d14a5b7990b9e409961a0800c8e0b66ab80b8c419c","entry_hash":"52d261edc538d8de8f13d99e7092f23f05cdf639923d0e3ed7fcbeda2d58fd12","detail":{"subject":"supply.lead_time_estimate","verdict":"allow","violations":[],"redacted_fields":[],"classification":"internal","latency_ms":2.032}}]}</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var DATA = JSON.parse(document.getElementById("trace-data").textContent);
+
+  var RULES = [
+    ["GOV-001", "ingress", "high",     "Tool sits outside the caller's role allowlist"],
+    ["GOV-002", "ingress", "high",     "A2A skill sits outside the caller's role allowlist"],
+    ["MCP-001", "ingress", "critical", "Peer negotiated an unsupported MCP protocol version"],
+    ["A2A-001", "ingress", "high",     "Requested skill is not declared on the peer's Agent Card"],
+    ["A2A-002", "ingress", "medium",   "Agent Card advertises a different A2A version than the bridge speaks"],
+    ["SEC-002", "ingress", "critical", "Restricted payload is crossing a vendor boundary"],
+    ["PRO-002", "ingress", "low",      "Delegation routed onto MCP, which has no task lifecycle"],
+    ["SEC-001", "egress",  "high",     "Response exposes PII fields above the caller's clearance"],
+    ["PRO-001", "egress",  "medium",   "Response classification exceeds the caller's clearance"],
+    ["TRC-001", "egress",  "medium",   "Trace id did not survive the hop"],
+    ["PRO-003", "egress",  "low",      "Failed result carries no error description"]
+  ];
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) { n.className = cls; }
+    if (text !== undefined) { n.textContent = text; }
+    return n;
+  }
+
+  function highlight(value) {
+    var raw = JSON.stringify(value, null, 2);
+    return raw.replace(/[&<>]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c];
+    }).replace(/"([^"\\]*(?:\\.[^"\\]*)*)"(\s*:)?/g, function (m, body, colon) {
+      if (colon) { return '<span class="k">"' + body + '"</span>' + colon; }
+      if (body === "[REDACTED]") { return '<span class="red">"' + body + '"</span>'; }
+      return '<span class="s">"' + body + '"</span>';
+    }).replace(/: (-?\d+\.?\d*)/g, ': <span class="n">$1</span>');
+  }
+
+  /* ---------- inspector ---------- */
+  var scnBox = document.getElementById("scenarios");
+  var pipe = document.getElementById("pipe");
+
+  DATA.scenarios.forEach(function (s, i) {
+    var b = el("button", "scn");
+    b.type = "button";
+    b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+    b.appendChild(el("span", "dot " + s.verdict));
+    b.appendChild(el("span", null, s.title));
+    b.addEventListener("click", function () { select(i); });
+    scnBox.appendChild(b);
+  });
+
+  function pipeNodes(s) {
+    var mid = s.route === "mcp"
+      ? { nm: "mcp_connector", rl: "MCPConnector \u00b7 stdio" }
+      : s.route === "a2a"
+        ? { nm: "a2a_gateway", rl: "A2AGateway \u00b7 HTTP" }
+        : { nm: "blocked", rl: "never dispatched" };
+
+    var nodes = [
+      { nm: "audit_ingress", rl: "admission control" },
+      { nm: mid.nm, rl: mid.rl, block: s.route === "blocked" }
+    ];
+    if (s.route !== "blocked") {
+      nodes.push({ nm: "audit_egress", rl: "egress control" });
+    }
+    nodes.push({ nm: "response", rl: s.verdict, block: s.verdict === "block" });
+    return nodes;
+  }
+
+  function renderPipe(s) {
+    pipe.textContent = "";
+    pipeNodes(s).forEach(function (n, i) {
+      if (i) { pipe.appendChild(el("div", "arrow", "\u2192")); }
+      var d = el("div", "node on" + (n.block ? " verdict-block" : ""));
+      d.appendChild(el("div", "nm", n.nm));
+      d.appendChild(el("div", "rl", n.rl));
+      pipe.appendChild(d);
+    });
+  }
+
+  function renderFindings(s) {
+    var box = document.getElementById("findings");
+    box.textContent = "";
+    if (!s.violations.length) {
+      box.appendChild(el("p", "clean", "No policy findings. The crossing was clean on both phases."));
+      return;
+    }
+    s.violations.forEach(function (v) {
+      var f = el("div", "finding " + v.severity);
+      var head = el("div");
+      head.appendChild(el("span", "code", v.code + "  \u00b7  " + v.phase));
+      head.appendChild(el("span", "sev", v.severity));
+      f.appendChild(head);
+      f.appendChild(el("div", "msg", v.message));
+      f.appendChild(el("div", "fix", "Remediation: " + v.remediation));
+      box.appendChild(f);
+    });
+  }
+
+  function select(i) {
+    var s = DATA.scenarios[i];
+    Array.prototype.forEach.call(scnBox.children, function (b, j) {
+      b.setAttribute("aria-pressed", j === i ? "true" : "false");
+    });
+    renderPipe(s);
+
+    document.getElementById("env-json").innerHTML = highlight({
+      trace_id: s.envelope.trace_id,
+      target: s.envelope.target,
+      intent: s.envelope.intent,
+      subject: s.envelope.subject,
+      classification: s.envelope.classification,
+      principal: s.envelope.principal,
+      payload: s.envelope.payload
+    });
+
+    var stamp = document.getElementById("stamp");
+    stamp.className = "stamp " + s.verdict;
+    stamp.textContent = s.verdict === "allow" ? "Cleared"
+      : s.verdict === "redact" ? "Redacted" : "Refused";
+
+    document.getElementById("latency").textContent =
+      s.result.latency_ms.toFixed(2) + " ms \u00b7 " + s.result.classification;
+
+    document.getElementById("res-json").innerHTML = highlight(
+      s.result.ok ? s.result.content : { error: s.result.error }
+    );
+
+    renderFindings(s);
+    document.getElementById("narrative").textContent = s.narrative || "";
+  }
+
+  /* ---------- rules ---------- */
+  var rb = document.getElementById("rules-body");
+  RULES.forEach(function (r) {
+    var tr = el("tr");
+    var c = el("td");
+    c.appendChild(el("span", "rule-code", r[0]));
+    tr.appendChild(c);
+    tr.appendChild(el("td", "phase", r[1]));
+    tr.appendChild(el("td", "sev-cell", r[2]));
+    tr.appendChild(el("td", null, r[3]));
+    rb.appendChild(tr);
+  });
+  document.getElementById("m-rules").textContent = String(RULES.length);
+  document.getElementById("m-scn").textContent = String(DATA.scenarios.length);
+  document.getElementById("m-ledger").textContent = String(DATA.ledger.length);
+
+  /* ---------- ledger: real SHA-256 chain verification ---------- */
+  var GENESIS = "0000000000000000000000000000000000000000000000000000000000000000";
+  var entries = JSON.parse(JSON.stringify(DATA.ledger));
+  var tampered = false;
+
+  /* Mirrors Python's json.dumps(sort_keys=True, separators=(",",":"), ensure_ascii=False) */
+  function canon(v) {
+    if (v === null) { return "null"; }
+    if (typeof v === "boolean") { return v ? "true" : "false"; }
+    if (typeof v === "number") { return String(v); }
+    if (typeof v === "string") { return JSON.stringify(v); }
+    if (Array.isArray(v)) { return "[" + v.map(canon).join(",") + "]"; }
+    return "{" + Object.keys(v).sort().map(function (k) {
+      return JSON.stringify(k) + ":" + canon(v[k]);
+    }).join(",") + "}";
+  }
+
+  function sha256(text) {
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+        return b.toString(16).padStart(2, "0");
+      }).join("");
+    });
+  }
+
+  function recompute(e) {
+    return sha256(canon({
+      seq: e.seq, ts: e.ts, event: e.event, trace_id: e.trace_id,
+      actor: e.actor, payload_digest: e.payload_digest,
+      prev_hash: e.prev_hash, detail: e.detail
+    }));
+  }
+
+  function renderChain(states) {
+    var box = document.getElementById("chain");
+    box.textContent = "";
+    entries.forEach(function (e, i) {
+      var st = states ? states[i] : null;
+      var cls = "ledger-entry" + (st === "broken" ? " broken" : st === "orphan" ? " orphan" : "");
+      var b = el("div", cls);
+      b.appendChild(el("div", "blk-seq", String(e.seq).padStart(2, "0")));
+
+      var mid = el("div");
+      mid.appendChild(el("div", "blk-ev", e.event));
+      var bits = e.actor + "  \u00b7  verdict " + (e.detail.verdict || "\u2014");
+      if (e.detail.violations && e.detail.violations.length) {
+        bits += "  \u00b7  " + e.detail.violations.join(", ");
+      }
+      mid.appendChild(el("div", "blk-meta", bits));
+      b.appendChild(mid);
+
+      var right = el("div");
+      right.appendChild(el("div", "blk-hash", e.entry_hash.slice(0, 20) + "\u2026"));
+      if (st) {
+        var label = st === "ok" ? "verified" : st === "broken" ? "ALTERED" : "unprovable";
+        var tone = st === "ok" ? "ok" : st === "broken" ? "bad" : "warn";
+        right.appendChild(el("div", "blk-state " + tone, label));
+      }
+      b.appendChild(right);
+      box.appendChild(b);
+    });
+  }
+
+  function setStatus(text, ok) {
+    var s = document.getElementById("chain-status");
+    s.className = "chain-status " + (ok ? "ok" : "bad");
+    s.textContent = text;
+  }
+
+  function verify() {
+    if (!window.crypto || !crypto.subtle) {
+      setStatus("Web Crypto unavailable \u2014 open this page over https to verify.", false);
+      return;
+    }
+    setStatus("recomputing\u2026", true);
+    Promise.all(entries.map(recompute)).then(function (hashes) {
+      var states = [];
+      var firstBreak = -1;
+      var expectedPrev = GENESIS;
+
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (hashes[i] !== e.entry_hash) {
+          if (firstBreak < 0) { firstBreak = i; }
+          states.push("broken");
+        } else if (e.prev_hash !== expectedPrev || firstBreak >= 0) {
+          if (firstBreak < 0) { firstBreak = i; }
+          states.push("orphan");
+        } else {
+          states.push("ok");
+        }
+        expectedPrev = e.entry_hash;
+      }
+
+      renderChain(states);
+      if (firstBreak < 0) {
+        setStatus("chain intact \u00b7 " + entries.length + " entries \u00b7 head " +
+          entries[entries.length - 1].entry_hash.slice(0, 12) + "\u2026", true);
+      } else {
+        setStatus("BROKEN at entry " + String(firstBreak).padStart(2, "0") +
+          " \u00b7 contents were altered \u00b7 " + (entries.length - firstBreak) +
+          " entries no longer provable", false);
+      }
+    });
+  }
+
+  document.getElementById("verify").addEventListener("click", verify);
+
+  document.getElementById("tamper").addEventListener("click", function () {
+    if (tampered) { return; }
+    entries[3].actor = "svc:attacker";
+    tampered = true;
+    this.disabled = true;
+    document.getElementById("restore").disabled = false;
+    verify();
+  });
+
+  document.getElementById("restore").addEventListener("click", function () {
+    entries = JSON.parse(JSON.stringify(DATA.ledger));
+    tampered = false;
+    this.disabled = true;
+    document.getElementById("tamper").disabled = false;
+    verify();
+  });
+
+  /* ---------- boot ---------- */
+  select(0);
+  renderChain(null);
+  verify();
+})();
+</script>
