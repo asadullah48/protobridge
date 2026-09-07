@@ -265,6 +265,32 @@ repository.
 
 See [SPEC.md](./SPEC.md) §12 for the full list.
 
+## 🤖 Agentic AI Alignment
+
+- **Autonomy** — the `ProtocolEnvelope` abstraction lets an MCP tool call
+  and an A2A delegation flow through one governed pipeline without the
+  calling code branching on which protocol is on the other side.
+- **Resilience** — sensitivity labels ride inside the message itself, so
+  a response carrying restricted data is caught and redacted *at the
+  boundary*, and every hop lands in a hash-chained ledger — tampering is
+  detectable and locatable, not just theoretically preventable.
+- **Adaptivity** — adding a new protocol costs 2N work (one codec pair),
+  not N² point-to-point translators, so the system scales to new agent
+  ecosystems without a combinatorial integration cost.
+
+### Roadmap
+
+- Add streaming support (explicitly out of scope today, honestly flagged
+  in the Agent Card) once a concrete streaming use case needs it.
+- Replace the in-memory ledger with a persistent, still-hash-chained
+  store for production cross-vendor deployments.
+
+## 🤖 Author
+
+Built by **Asadullah Shafique**.
+
+🔗 Explore my portfolio showcasing Agentic AI projects and real-world applications: [asadullahshafique-devunity.vercel.app](https://asadullahshafique-devunity.vercel.app)
+
 ## License
 
 MIT
