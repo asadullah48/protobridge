@@ -224,7 +224,7 @@ deterministic reasoner. It never breaks the bridge.
 ## Development
 
 ```bash
-uv run pytest          # 41 tests
+uv run pytest          # 62 tests
 uv run ruff check .
 uv run ruff format .
 ```
@@ -249,6 +249,7 @@ src/protobridge/
   ledger.py              hash-chained audit ledger
   graph.py               LangGraph wiring
   llm.py                 pluggable narration (offline by default)
+  crm.py                 Twenty CRM adapter — contacts/companies/deals as governed MCP tools
   cli.py                 command-line entry point
 ```
 
