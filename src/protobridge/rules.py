@@ -387,7 +387,9 @@ def decide_verdict(violations: list[Violation], phase: Phase) -> Verdict:
     * **Egress prefers REDACT over BLOCK.** The expensive work already
       happened and the caller usually needs the non-sensitive remainder, so
       dropping the offending fields beats discarding the whole response.
-      Only ``CRITICAL`` findings destroy the result outright.
+      ``CRITICAL`` findings and classification excess without recognized PII
+      (``PRO-001``) destroy the result outright: field redaction cannot sanitize
+      an otherwise classified document.
 
     Trade-offs an operator may want to invert: a regulated tenant might make
     egress fail-closed too, accepting the wasted work; a latency-sensitive one
@@ -401,6 +403,9 @@ def decide_verdict(violations: list[Violation], phase: Phase) -> Verdict:
     if phase is Phase.INGRESS:
         return Verdict.BLOCK if worst.rank >= Severity.HIGH.rank else Verdict.ALLOW
 
+    # No known fields can be removed to make a PRO-001 response safe.
+    if any(v.code == "PRO-001" for v in violations):
+        return Verdict.BLOCK
     if worst is Severity.CRITICAL:
         return Verdict.BLOCK
     if worst.rank >= Severity.HIGH.rank:

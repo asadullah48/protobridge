@@ -302,6 +302,7 @@ The default is deliberately **asymmetric**:
 |---|---|---|---|
 | ingress | ≥ high | `BLOCK` | Nothing has left the building; blocking is cheap |
 | ingress | < high | `ALLOW` | Recorded, not enforced |
+| egress | `PRO-001` (any severity) | `BLOCK` | No recognized PII fields to redact; withhold classified content |
 | egress | critical | `BLOCK` | Destroy the response outright |
 | egress | high | `REDACT` | The work is already paid for; drop the fields, keep the rest |
 | egress | < high | `ALLOW` | Recorded, not enforced |
