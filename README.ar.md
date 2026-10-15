@@ -167,7 +167,7 @@ PROTOBRIDGE_LLM=ollama uv run protobridge demo
 ## التطوير
 
 ```bash
-uv run pytest          # 64 اختبارًا
+uv run pytest          # 65 اختبارًا
 uv run ruff check .
 uv run ruff format .
 ```

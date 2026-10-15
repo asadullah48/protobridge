@@ -6,7 +6,7 @@ Speak Anthropic's **Model Context Protocol** and Google's **Agent2Agent**
 through one governed pipeline — without the calling code knowing which protocol
 is on the other side, and without losing the compliance signal at the boundary.
 
-Runs entirely offline. No API keys, no accounts, no cloud egress.
+The bundled demos run locally with no API keys, accounts or cloud egress.
 
 **[▶ Live interactive demo](https://asadullah48.github.io/protobridge/)** — inspect real traces and verify the
 audit chain with SHA-256 in your own browser.
@@ -170,9 +170,6 @@ uv run protobridge crm
 With neither variable set the adapter uses a deterministic offline fixture, so
 the zero-key promise above still holds on a fresh clone.
 
-The adapter handles workspace-specific response shapes; see the limits below
-for the live deployment boundary.
-
 ---
 
 ## Design decisions worth knowing
@@ -227,7 +224,7 @@ deterministic reasoner. It never breaks the bridge.
 ## Development
 
 ```bash
-uv run pytest          # 64 tests
+uv run pytest          # 65 tests
 uv run ruff check .
 uv run ruff format .
 ```
@@ -275,11 +272,10 @@ This is a **reference implementation**, and the boundaries are deliberate:
 - Hash chaining detects edits relative to a trusted chain head. An attacker who
   can rewrite the entire ledger can recompute it; retain the head independently.
 
-Infrastructure non-goals: no
-authentication, TLS, rate limiting, or persistence; the A2A server is
-`http.server`; the ledger is in-memory with a JSON Lines export seam; streaming
-is out of scope and the Agent Card says so honestly. Bundled tool and skill fixtures are synthetic; configuring Twenty credentials
-connects the adapter to a real workspace.
+Infrastructure non-goals: authentication, TLS, rate limiting and durable storage.
+The A2A server uses `http.server`; the ledger is in memory with JSON Lines export.
+Streaming is unsupported and declared as such in the Agent Card. Bundled tool
+and skill fixtures are synthetic; Twenty credentials connect to a real workspace.
 
 See [SPEC.md](./SPEC.md) §12 for the full list.
 
@@ -298,8 +294,7 @@ See [SPEC.md](./SPEC.md) §12 for the full list.
 
 ### Roadmap
 
-- Add streaming support (explicitly out of scope today, honestly flagged
-  in the Agent Card) once a concrete streaming use case needs it.
+- Add streaming support when a concrete streaming use case needs it.
 - Replace the in-memory ledger with a persistent, still-hash-chained
   store for production cross-vendor deployments.
 

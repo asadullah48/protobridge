@@ -383,3 +383,27 @@ def test_non_pii_above_clearance_is_blocked(planner, classification):
     assert "PRO-001" in outcome.result.error
     assert result.content == {"strategy": "Unreleased acquisition plan"}
     assert audit.ledger.verify().valid
+
+
+def test_unsupported_a2a_version_never_reaches_delegate(planner):
+    class UnsupportedPeer:
+        def discover(self):
+            return {
+                "protocolVersion": "1999-01-01",
+                "skills": [{"id": "vendor.risk_assessment"}],
+            }
+
+        def delegate(self, env):
+            pytest.fail("unsupported peer must not receive the request")
+
+    ledger = AuditLedger()
+    app = build_bridge(
+        a2a_gateway=UnsupportedPeer(), ledger=ledger, reasoner=DeterministicReasoner()
+    )
+    env = ProtocolEnvelope(target=Protocol.A2A, subject="vendor.risk_assessment", principal=planner)
+    state = run_envelope(app, env)
+    assert state["route"] == "blocked"
+    assert state["result"].content == {}
+    assert "A2A-002" in state["result"].error
+    assert [entry.event for entry in ledger] == ["a2a.ingress"]
+    assert ledger.verify().valid

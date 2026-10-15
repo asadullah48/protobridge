@@ -218,12 +218,12 @@ def evaluate_ingress(
                 violations.append(
                     Violation(
                         code="A2A-002",
-                        severity=Severity.MEDIUM,
+                        severity=Severity.HIGH,
                         message=(
                             f"agent card advertises A2A {card_version}, bridge speaks "
                             f"{a2a_proto.PROTOCOL_VERSION}"
                         ),
-                        remediation="verify field compatibility before trusting the peer",
+                        remediation="use a peer advertising the supported A2A version",
                         phase=Phase.INGRESS,
                     )
                 )

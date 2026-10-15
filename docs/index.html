@@ -459,7 +459,7 @@ footer { border-top: 1px solid var(--edge); padding: 44px 0 60px; }
       <div class="metric"><div class="n" id="m-scn">6</div><div class="l">real traces, captured live</div></div>
       <div class="metric"><div class="n" id="m-rules">11</div><div class="l">compliance rules</div></div>
       <div class="metric"><div class="n" id="m-ledger">10</div><div class="l">chained ledger entries</div></div>
-      <div class="metric"><div class="n">41</div><div class="l">tests passing</div></div>
+      <div class="metric"><div class="n">65</div><div class="l">tests passing</div></div>
       <div class="metric"><div class="n">0</div><div class="l">API keys required</div></div>
     </div>
   </div>
@@ -513,7 +513,7 @@ footer { border-top: 1px solid var(--edge); padding: 44px 0 60px; }
     </div>
     <p class="note">Enforcement lives in a single function marked <code>=== POLICY SEAM ===</code>. The default is
       asymmetric: ingress is fail-closed, because nothing has left the building yet and blocking is cheap. Egress
-      prefers redaction, because the expensive work is already paid for and the caller usually needs the rest.</p>
+      redacts known PII fields; above-clearance content without known PII fields is blocked.</p>
   </section>
 
   <section id="ledger">
@@ -566,7 +566,7 @@ footer { border-top: 1px solid var(--edge); padding: 44px 0 60px; }
     ["GOV-003", "ingress", "critical", "A write tool mutates a record for a role without write permission"],
     ["MCP-001", "ingress", "critical", "Peer negotiated an unsupported MCP protocol version"],
     ["A2A-001", "ingress", "high",     "Requested skill is not declared on the peer's Agent Card"],
-    ["A2A-002", "ingress", "medium",   "Agent Card advertises a different A2A version than the bridge speaks"],
+    ["A2A-002", "ingress", "high",     "Agent Card advertises a different A2A version than the bridge speaks"],
     ["SEC-002", "ingress", "critical", "Restricted payload is crossing a vendor boundary"],
     ["PRO-002", "ingress", "low",      "Delegation routed onto MCP, which has no task lifecycle"],
     ["SEC-001", "egress",  "high",     "Response exposes PII fields above the caller's clearance"],
