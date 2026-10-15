@@ -6,7 +6,7 @@ Speak Anthropic's **Model Context Protocol** and Google's **Agent2Agent**
 through one governed pipeline — without the calling code knowing which protocol
 is on the other side, and without losing the compliance signal at the boundary.
 
-Runs entirely offline. No API keys, no accounts, no cloud egress.
+The bundled demos run locally with no API keys, accounts or cloud egress.
 
 **[▶ Live interactive demo](https://asadullah48.github.io/protobridge/)** — inspect real traces and verify the
 audit chain with SHA-256 in your own browser.
@@ -36,7 +36,8 @@ the things auditors ask about.
 ## Quickstart
 
 ```bash
-git clone <this-repo> && cd protobridge
+git clone https://github.com/asadullah48/protobridge.git
+cd protobridge
 uv sync --extra dev
 uv run protobridge demo
 ```
@@ -169,11 +170,6 @@ uv run protobridge crm
 With neither variable set the adapter uses a deterministic offline fixture, so
 the zero-key promise above still holds on a fresh clone.
 
-One caveat worth knowing: **Twenty has no static API reference.** Each
-workspace generates its own schema — add a custom object and it immediately
-gets REST endpoints beside the built-in ones. The adapter is therefore
-defensive about response shapes rather than assuming a fixed contract.
-
 ---
 
 ## Design decisions worth knowing
@@ -186,6 +182,10 @@ envelope fields, not transport headers — headers do not survive an MCP stdio h
 
 **Protocols are extended, never forked.** Labels travel in MCP's reserved `_meta`
 and A2A's `metadata`, so a stock client on the other end still interoperates.
+
+**Classification-aware egress.** Known PII fields are redacted for under-cleared
+callers; above-clearance documents without recognized PII fields are blocked.
+The decision remains in the policy seam.
 
 **Two audit phases, because they see different things.** Ingress cannot know a
 response will carry a national id; egress cannot un-send a request.
@@ -224,7 +224,7 @@ deterministic reasoner. It never breaks the bridge.
 ## Development
 
 ```bash
-uv run pytest          # 62 tests
+uv run pytest          # 65 tests
 uv run ruff check .
 uv run ruff format .
 ```
@@ -255,14 +255,27 @@ src/protobridge/
 
 ---
 
-## Status and limitations
+## Limits / non-goals
 
-This is a **reference implementation**, and the boundaries are deliberate: no
-authentication, TLS, rate limiting, or persistence; the A2A server is
-`http.server`; the ledger is in-memory with a JSON Lines export seam; streaming
-is out of scope and the Agent Card says so honestly. All tool and skill data is
-synthetic — no real employee, vendor, or FX data appears anywhere in this
-repository.
+This is a **reference implementation**, and the boundaries are deliberate:
+
+- The MCP and A2A implementations cover the operations exercised by the reference
+  peers and tests; this is not a full protocol conformance certification.
+- Principals, clearances and vendor-boundary flags are supplied by the caller;
+  deployments must bind these to authenticated identities.
+- PII redaction matches configured field names, not arbitrary sensitive text.
+  Above-clearance responses without recognized PII fields are blocked because
+  field redaction cannot sanitize them. For PII-bearing responses, the remaining
+  fields are assumed safe by the reference policy.
+- Twenty integration is verified against offline fixtures, not a live customer
+  workspace. Workspace-specific schemas need deployment validation.
+- Hash chaining detects edits relative to a trusted chain head. An attacker who
+  can rewrite the entire ledger can recompute it; retain the head independently.
+
+Infrastructure non-goals: authentication, TLS, rate limiting and durable storage.
+The A2A server uses `http.server`; the ledger is in memory with JSON Lines export.
+Streaming is unsupported and declared as such in the Agent Card. Bundled tool
+and skill fixtures are synthetic; Twenty credentials connect to a real workspace.
 
 See [SPEC.md](./SPEC.md) §12 for the full list.
 
@@ -281,8 +294,7 @@ See [SPEC.md](./SPEC.md) §12 for the full list.
 
 ### Roadmap
 
-- Add streaming support (explicitly out of scope today, honestly flagged
-  in the Agent Card) once a concrete streaming use case needs it.
+- Add streaming support when a concrete streaming use case needs it.
 - Replace the in-memory ledger with a persistent, still-hash-chained
   store for production cross-vendor deployments.
 

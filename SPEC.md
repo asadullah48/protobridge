@@ -264,7 +264,7 @@ protocol.
 | `GOV-003` | critical | A write tool is invoked by a role outside `ROLE_WRITE_PERMISSION` |
 | `MCP-001` | critical | Peer negotiated an unsupported MCP protocol version |
 | `A2A-001` | high | Requested skill is not declared on the peer's Agent Card |
-| `A2A-002` | medium | Agent Card advertises a different A2A version than the bridge speaks |
+| `A2A-002` | high | Agent Card advertises a different A2A version than the bridge speaks |
 | `SEC-002` | critical | `restricted` payload is crossing a vendor boundary |
 | `PRO-002` | low | Delegation intent routed onto MCP, which has no task lifecycle |
 
@@ -302,6 +302,7 @@ The default is deliberately **asymmetric**:
 |---|---|---|---|
 | ingress | ≥ high | `BLOCK` | Nothing has left the building; blocking is cheap |
 | ingress | < high | `ALLOW` | Recorded, not enforced |
+| egress | `PRO-001` (any severity) | `BLOCK` | No recognized PII fields to redact; withhold classified content |
 | egress | critical | `BLOCK` | Destroy the response outright |
 | egress | high | `REDACT` | The work is already paid for; drop the fields, keep the rest |
 | egress | < high | `ALLOW` | Recorded, not enforced |
@@ -349,7 +350,7 @@ a synthetic chain to show the break being detected and located.
 
 ## 10. Conformance
 
-Every claim above is covered by an executable test (`uv run pytest`, 41 tests):
+The suite exercises the following behaviors (`uv run pytest`, 65 tests):
 
 | Area | Tests |
 |---|---|
@@ -359,6 +360,8 @@ Every claim above is covered by an executable test (`uv run pytest`, 41 tests):
 | A2A Agent Card, task lifecycle, peer-side refusal, trace echo | `tests/test_protocols.py` |
 | Ledger chaining, tamper detection, digest-not-payload | `tests/test_compliance.py` |
 | Each rule code | `tests/test_compliance.py` |
+| Unsupported A2A version blocked before delegation | `tests/test_compliance.py` |
+| Twenty CRM tools, redaction and write permissions | `tests/test_crm.py` |
 | Policy seam asymmetry | `tests/test_compliance.py` |
 | End-to-end allow / redact / block routes | `tests/test_compliance.py` |
 
