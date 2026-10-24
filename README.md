@@ -1,5 +1,7 @@
 # ProtoBridge
 
+[![Tests](https://github.com/asadullah48/protobridge/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/asadullah48/protobridge/actions/workflows/tests.yml)
+
 **An MCP + A2A interoperability layer for agentic AI systems.**
 
 Speak Anthropic's **Model Context Protocol** and Google's **Agent2Agent**
@@ -224,7 +226,7 @@ deterministic reasoner. It never breaks the bridge.
 ## Development
 
 ```bash
-uv run pytest          # 65 tests
+uv run pytest -q       # 65 tests passing (verified 24 Oct 2026, commit 3449d8d)
 uv run ruff check .
 uv run ruff format .
 ```
