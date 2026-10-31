@@ -8,7 +8,7 @@ A local reference implementation using **synthetic data**, not a production prod
 
 ## Demo
 
-> **TODO:** Add a demo recording.
+**Demo (60 s):** [Watch on YouTube](https://www.youtube.com/watch?v=UZVbfmGNEBU) — tests, live demo run, audit chain check, CRM adapter.
 
 ## Run it
 
