@@ -133,7 +133,7 @@ is on the other side, and without losing the compliance signal at the boundary.
 
 The bundled demos run locally with no API keys, accounts or cloud egress.
 
-**[▶ Live interactive demo](https://asadullah48.github.io/protobridge/)** — inspect real traces and verify the
+**[▶ Interactive demo (static, GitHub Pages)](https://asadullah48.github.io/protobridge/)** — inspect real traces and verify the
 audit chain with SHA-256 in your own browser.
 
 *[العربية](./README.ar.md) · [Full specification](./SPEC.md) · [Portfolio](https://asadullahshafique-devunity.vercel.app)*
@@ -243,7 +243,7 @@ you cannot forget to call it.
 
 ---
 
-## Real integration: Twenty CRM as governed tools
+## Twenty CRM adapter as governed tools (tested on offline fixtures)
 
 Synthetic fixtures only prove so much, so ProtoBridge ships an adapter for
 [Twenty](https://twenty.com), the open-source CRM. Contacts, companies, deals
