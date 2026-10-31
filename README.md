@@ -2,6 +2,129 @@
 
 [![Tests](https://github.com/asadullah48/protobridge/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/asadullah48/protobridge/actions/workflows/tests.yml)
 
+**The problem:** MCP tools and A2A agents speak different protocols; ProtoBridge routes both through one audited `ProtocolEnvelope` pipeline.
+
+A local reference implementation using **synthetic data**, not a production product.
+
+## Demo
+
+> **TODO:** Add a demo recording.
+
+## Run it
+
+From the repo root, with [uv](https://docs.astral.sh/uv/) installed:
+
+```bash
+uv run --extra dev protobridge demo --llm deterministic
+```
+
+This starts a local A2A HTTP peer on an ephemeral port and an MCP server
+subprocess. It makes real JSON-RPC `initialize`, `tools/list` and `tools/call`
+requests over stdio, then A2A `message/send` requests over HTTP. Both routes
+use the audit pipeline. The command stops both peers when it finishes.
+All tools, people, vendors, rates and agent responses are **synthetic fixtures**;
+no external service or API key is needed.
+
+**VERIFIED, 31 Oct 2026:** The command above exited successfully. Full console
+output follows, exactly as printed by the CLI (which caps content at 200
+characters). Ports, timestamps, latency and ledger hashes vary between runs.
+
+<details>
+<summary>Full output of that run (the port, timestamps and ledger head change every run)</summary>
+
+```
+------------------------------------------------------------------------
+ProtoBridge 0.1.0 - MCP + A2A interoperability demo
+  MCP protocol : 2025-06-18 (stdio, subprocess)
+  A2A protocol : 0.3.0 (http, ephemeral port)
+  reasoner     : deterministic
+------------------------------------------------------------------------
+
+discovered A2A peer: Northwind Vendor Risk Agent @ http://127.0.0.1:61250
+  skills: vendor.risk_assessment, supply.lead_time_estimate
+discovered MCP tools: fx.convert, kb.search, hr.employee_lookup
+
+[1] MCP tool call, fully permitted
+    route     : mcp
+    verdict   : allow
+    findings  : none
+    content   : {"amount": 250.0, "from": "USD", "to": "PKR", "rate": 278.5, "converted": 69625.0}
+    latency   : 0.3 ms
+    narrative : MCP call to 'fx.convert' completed cleanly; no policy findings.
+
+[2] MCP tool returning PII, caller under-cleared -> redaction
+    route     : mcp
+    verdict   : redact
+    findings  : SEC-001(high)
+    redacted  : email, national_id, salary_band
+    content   : {"record": {"employee_id": "E-1001", "name": "Ada Lovelace", "email": "[REDACTED]", "national_id": "[REDACTED]", "salary_band": "[REDACTED]", "department": "Platform Engineering"}}
+    latency   : 0.2 ms
+    narrative : MCP call to 'hr.employee_lookup' was allowed after redacting sensitive fields. 1 finding(s) [SEC-001]; most severe high: response exposes PII fields ['email', 'national_id', 'salary_band'] at classification restricted, above principal clearance internal Remediation: redact the fields or raise the principal's clearance.
+
+[3] MCP tool outside the caller's allowlist -> blocked at ingress
+    route     : blocked
+    verdict   : block
+    findings  : GOV-001(high)
+    error     : blocked at ingress by AuditAgent: GOV-001
+    latency   : 0.0 ms
+    narrative : MCP call to 'hr.employee_lookup' was blocked. 1 finding(s) [GOV-001]; most severe high: role 'planner' is not permitted to invoke tool 'hr.employee_lookup' Remediation: add the tool to ROLE_TOOL_ALLOWLIST or use a privileged role.
+
+[4] A2A delegation to a cross-vendor agent
+    route     : a2a
+    verdict   : allow
+    findings  : none
+    content   : {"skill": "vendor.risk_assessment", "vendor": "globex-freight", "risk_score": 0.58, "tier": "medium", "assessed_at": "2026-10-31T05:49:30.497262+00:00"}
+    latency   : 2.7 ms
+    narrative : A2A call to 'vendor.risk_assessment' completed cleanly; no policy findings.
+
+[5] A2A delegation carrying restricted data across a vendor boundary
+    route     : blocked
+    verdict   : block
+    findings  : SEC-002(critical)
+    error     : blocked at ingress by AuditAgent: SEC-002
+    latency   : 0.0 ms
+    narrative : A2A call to 'vendor.risk_assessment' was blocked. 1 finding(s) [SEC-002]; most severe critical: restricted-classification payload is being sent to an agent operated by another vendor Remediation: execute a data processing addendum or downgrade the payload.
+
+[6] A2A delegation to a second declared skill
+    route     : a2a
+    verdict   : allow
+    findings  : none
+    content   : {"skill": "supply.lead_time_estimate", "vendor": "acme-logistics", "lead_time_days": 12, "assessed_at": "2026-10-31T05:49:30.503122+00:00"}
+    latency   : 2.3 ms
+    narrative : A2A call to 'supply.lead_time_estimate' completed cleanly; no policy findings.
+
+------------------------------------------------------------------------
+audit ledger
+  entries    : 10
+  chain      : INTACT
+  head       : ad9c57e9df00c1b50f0adb5bcf2fef8ccb19ccf0c8f9a0853590c6789287934a
+------------------------------------------------------------------------
+```
+
+</details>
+
+## How the protocols connect
+
+```mermaid
+flowchart LR
+    MS["MCP server subprocess"] <-->|"JSON-RPC over stdio<br/>initialize / tools/list / tools/call"| MC["MCPConnector"]
+    MC <-->|"target = mcp"| E["ProtocolEnvelope<br/>AuditAgent ingress / egress"]
+    E <-->|"target = a2a"| AG["A2AGateway"]
+    AG <-->|"JSON-RPC over HTTP<br/>message/send"| AP["A2A HTTP peer<br/>Agent Card discovery"]
+```
+
+Drawn from [the demo](src/protobridge/cli.py),
+[connectors](src/protobridge/agents.py), [graph routing](src/protobridge/graph.py),
+and the [MCP](src/protobridge/protocols/mcp.py) and
+[A2A](src/protobridge/protocols/a2a.py) transports.
+The caller creates an envelope; its `target` selects one protocol per call.
+An MCP response is not automatically forwarded to the A2A peer.
+Ingress can block dispatch; egress checks the returned `EnvelopeResult`.
+
+---
+
+## Overview
+
 **An MCP + A2A interoperability layer for agentic AI systems.**
 
 Speak Anthropic's **Model Context Protocol** and Google's **Agent2Agent**
