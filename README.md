@@ -349,6 +349,7 @@ deterministic reasoner. It never breaks the bridge.
 ## Development
 
 ```bash
+uv sync --extra dev
 uv run pytest -q       # 65 tests passing (verified 24 Oct 2026, commit 3449d8d)
 uv run ruff check .
 uv run ruff format .
