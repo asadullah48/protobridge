@@ -8,7 +8,9 @@ A local reference implementation using **synthetic data**, not a production prod
 
 ## Demo
 
-**Demo (60 s):** [Watch on YouTube](https://www.youtube.com/watch?v=UZVbfmGNEBU) — tests, live demo run, audit chain check, CRM adapter.
+**Demo (1 min 38 s, narrated):** [Watch on YouTube](https://youtu.be/fRyhCSqvunk) — tests, live demo run, audit chain check, CRM adapter.
+
+[![ProtoBridge demo video](https://img.youtube.com/vi/fRyhCSqvunk/hqdefault.jpg)](https://youtu.be/fRyhCSqvunk)
 
 ## Run it
 
