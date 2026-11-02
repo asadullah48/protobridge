@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from http.client import HTTPConnection
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -12,6 +12,7 @@ from protobridge import cli
 from protobridge.protocols import a2a as a2a_proto
 from protobridge.protocols import mcp as mcp_proto
 from protobridge.protocols.jsonrpc import (
+    INVALID_REQUEST,
     METHOD_NOT_FOUND,
     Dispatcher,
     JsonRpcError,
@@ -225,20 +226,45 @@ def test_a2a_default_task_cap_is_500():
     assert len(tasks) == a2a_proto.MAX_TASKS == 500
 
 
+def _post_headers_only(base_url: str, content_length: str | None) -> tuple[int, dict, str | None]:
+    """POST with no body bytes, so the server never leaves unread data on the socket.
+
+    A server that closes with unread bytes pending makes Linux send a TCP reset,
+    which can wipe the response before the client reads it. Sending headers only
+    keeps the reply deterministic.
+    """
+    url = urlsplit(base_url)
+    conn = HTTPConnection(url.hostname, url.port, timeout=5)
+    try:
+        conn.putrequest("POST", "/")
+        conn.putheader("Content-Type", "application/json")
+        if content_length is not None:
+            conn.putheader("Content-Length", content_length)
+        conn.endheaders()
+        resp = conn.getresponse()
+        return resp.status, json.loads(resp.read()), resp.getheader("Connection")
+    finally:
+        conn.close()
+
+
 def test_a2a_rejects_oversized_body_with_413():
-    body = json.dumps(
-        request(
-            "message/send",
-            {"message": a2a_proto.text_message("x" * a2a_proto.MAX_BODY_BYTES)},
-            id=1,
-        )
-    ).encode("utf-8")
-    assert len(body) > a2a_proto.MAX_BODY_BYTES
     with a2a_proto.running_server() as base_url:
-        req = Request(f"{base_url}/", data=body, headers={"Content-Type": "application/json"})
-        with pytest.raises(HTTPError) as excinfo:
-            urlopen(req, timeout=5)  # noqa: S310
-        assert excinfo.value.code == 413
+        status, body, connection = _post_headers_only(base_url, str(a2a_proto.MAX_BODY_BYTES + 1))
+        assert status == 413
+        assert body["error"]["code"] == INVALID_REQUEST
+        assert connection == "close"
         # The server keeps serving normal-sized requests afterwards.
+        task = a2a_proto.A2AClient(base_url).send_message("Assess acme-logistics")
+    assert task["status"]["state"] == a2a_proto.TaskState.COMPLETED
+
+
+@pytest.mark.parametrize("content_length", ["-5", "abc", None])
+def test_a2a_rejects_bad_content_length_with_400(content_length):
+    with a2a_proto.running_server() as base_url:
+        status, body, connection = _post_headers_only(base_url, content_length)
+        assert status == 400
+        assert body["error"]["code"] == INVALID_REQUEST
+        assert connection == "close"
+        # The handler thread did not hang: the server still answers.
         task = a2a_proto.A2AClient(base_url).send_message("Assess acme-logistics")
     assert task["status"]["state"] == a2a_proto.TaskState.COMPLETED

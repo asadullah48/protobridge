@@ -332,7 +332,15 @@ class _Handler(BaseHTTPRequestHandler):
         self._respond(404, {"error": "not found", "path": self.path})
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
-        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            length = int(self.headers["Content-Length"])
+        except (TypeError, ValueError):  # header missing or not a number
+            length = -1
+        if length < 0:
+            # rfile.read() with an unknown size would block until the client hangs up.
+            self.close_connection = True
+            self._respond(400, failure(None, INVALID_REQUEST, "missing or invalid Content-Length"))
+            return
         if length > MAX_BODY_BYTES:
             # The unread body would poison a kept-alive connection, so drop it.
             self.close_connection = True
