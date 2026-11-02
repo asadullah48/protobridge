@@ -25,6 +25,7 @@ from urllib.request import Request, urlopen
 
 from protobridge.protocols.jsonrpc import (
     INVALID_PARAMS,
+    INVALID_REQUEST,
     Dispatcher,
     JsonRpcError,
     failure,
@@ -36,6 +37,8 @@ PROTOCOL_VERSION = "0.3.0"
 AGENT_CARD_PATH = "/.well-known/agent.json"
 AGENT_CARD_PATH_ALT = "/.well-known/agent-card.json"
 RPC_PATH = "/"
+MAX_TASKS = 500
+MAX_BODY_BYTES = 32 * 1024
 
 CLASSIFICATION_METADATA_KEY = "protobridge/classification"
 TRACE_METADATA_KEY = "protobridge/traceId"
@@ -202,8 +205,15 @@ def message_text(message: dict[str, Any]) -> str:
 # --------------------------------------------------------------------------
 
 
-def build_server() -> tuple[Dispatcher, dict[str, dict[str, Any]]]:
-    """Build the A2A dispatcher and expose its in-memory task store."""
+def build_server(
+    card: dict[str, Any] | None = None, max_tasks: int = MAX_TASKS
+) -> tuple[Dispatcher, dict[str, dict[str, Any]]]:
+    """Build the A2A dispatcher and expose its in-memory task store.
+
+    The store keeps at most ``max_tasks`` tasks; the oldest are evicted first,
+    so a public agent cannot be grown without bound by ``message/send``.
+    """
+    card = card or AGENT_CARD
     tasks: dict[str, dict[str, Any]] = {}
     rpc = Dispatcher()
 
@@ -232,6 +242,8 @@ def build_server() -> tuple[Dispatcher, dict[str, dict[str, Any]]]:
             "status": {"state": TaskState.SUBMITTED, "timestamp": _now_iso()},
         }
         tasks[task_id] = task
+        while len(tasks) > max_tasks:
+            del tasks[next(iter(tasks))]  # dicts keep insertion order: oldest first
 
         # Boundary policy: this agent belongs to another vendor and refuses
         # restricted material outright, regardless of what the caller claims.
@@ -288,7 +300,7 @@ def build_server() -> tuple[Dispatcher, dict[str, dict[str, Any]]]:
 
     @rpc.method("agent/getAuthenticatedExtendedCard")
     def _extended_card(_params: dict[str, Any]) -> dict[str, Any]:
-        return dict(AGENT_CARD)
+        return dict(card)
 
     return rpc, tasks
 
@@ -298,6 +310,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     protocol_version = "HTTP/1.1"
     rpc: Dispatcher  # injected by make_server
+    card: dict[str, Any]  # injected by make_server
 
     def log_message(self, fmt: str, *args: Any) -> None:
         return  # keep stdout clean; the CLI prints its own banner
@@ -307,17 +320,24 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(raw)))
+        if self.close_connection:
+            self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(raw)
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         if self.path in (AGENT_CARD_PATH, AGENT_CARD_PATH_ALT):
-            self._respond(200, AGENT_CARD)
+            self._respond(200, self.card)
             return
         self._respond(404, {"error": "not found", "path": self.path})
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         length = int(self.headers.get("Content-Length") or 0)
+        if length > MAX_BODY_BYTES:
+            # The unread body would poison a kept-alive connection, so drop it.
+            self.close_connection = True
+            self._respond(413, failure(None, INVALID_REQUEST, "request body too large"))
+            return
         raw = self.rfile.read(length) if length else b""
         response = self.rpc.dispatch_raw(raw)
         if response is None:
@@ -332,21 +352,33 @@ class _Handler(BaseHTTPRequestHandler):
         self._respond(405, failure(None, INVALID_PARAMS, "method not allowed"))
 
 
-def make_server(host: str = "127.0.0.1", port: int = 8931) -> ThreadingHTTPServer:
-    """Create (but do not start) an A2A HTTP server."""
-    rpc, _tasks = build_server()
-    handler = type("BoundA2AHandler", (_Handler,), {"rpc": rpc})
-    return ThreadingHTTPServer((host, port), handler)
+def make_server(
+    host: str = "127.0.0.1", port: int = 8931, public_url: str | None = None
+) -> ThreadingHTTPServer:
+    """Create (but do not start) an A2A HTTP server.
+
+    The served Agent Card advertises ``public_url``, defaulting to the bound
+    ``http://{host}:{port}/`` (resolved after binding, so ``port=0`` works).
+    """
+    handler = type("BoundA2AHandler", (_Handler,), {})
+    server = ThreadingHTTPServer((host, port), handler)
+    bound_host, bound_port = server.server_address[0], server.server_address[1]
+    card = {**AGENT_CARD, "url": public_url or f"http://{bound_host}:{bound_port}/"}
+    handler.rpc, _tasks = build_server(card)
+    handler.card = card
+    return server
 
 
 @contextmanager
-def running_server(host: str = "127.0.0.1", port: int = 0) -> Iterator[str]:
+def running_server(
+    host: str = "127.0.0.1", port: int = 0, public_url: str | None = None
+) -> Iterator[str]:
     """Run an A2A server on a background thread; yield its base URL.
 
     Passing ``port=0`` binds an ephemeral port, which keeps tests from
     colliding with an already-running instance.
     """
-    server = make_server(host, port)
+    server = make_server(host, port, public_url)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     bound_host, bound_port = server.server_address[0], server.server_address[1]

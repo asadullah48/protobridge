@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import json
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
 import pytest
 
+from protobridge import cli
 from protobridge.protocols import a2a as a2a_proto
 from protobridge.protocols import mcp as mcp_proto
 from protobridge.protocols.jsonrpc import (
@@ -173,3 +178,67 @@ def test_a2a_legacy_tasks_send_alias_still_works():
         request("tasks/send", {"message": a2a_proto.text_message("hello")}, id=1)
     )
     assert unwrap(response)["kind"] == "task"
+
+
+def test_a2a_card_url_defaults_to_the_bound_address():
+    with a2a_proto.running_server() as base_url:
+        card = a2a_proto.A2AClient(base_url).fetch_agent_card()
+    assert card["url"] == f"{base_url}/"
+
+
+def test_a2a_card_url_uses_public_url_when_given():
+    public = "https://agents.example.com/northwind/"
+    with a2a_proto.running_server(public_url=public) as base_url:
+        client = a2a_proto.A2AClient(base_url)
+        card = client.fetch_agent_card()
+        extended = client._rpc("agent/getAuthenticatedExtendedCard", {})
+    assert card["url"] == extended["url"] == public
+
+
+def test_serve_a2a_public_url_reads_flag_then_env(monkeypatch):
+    monkeypatch.delenv("PROTOBRIDGE_PUBLIC_URL", raising=False)
+    assert cli.build_parser().parse_args(["serve-a2a"]).public_url is None
+    monkeypatch.setenv("PROTOBRIDGE_PUBLIC_URL", "https://env.example.com/")
+    assert cli.build_parser().parse_args(["serve-a2a"]).public_url == "https://env.example.com/"
+    args = cli.build_parser().parse_args(["serve-a2a", "--public-url", "https://flag.example.com/"])
+    assert args.public_url == "https://flag.example.com/"
+
+
+def test_a2a_task_store_evicts_oldest_beyond_cap():
+    rpc, tasks = a2a_proto.build_server(max_tasks=2)
+    ids = [
+        unwrap(
+            rpc.dispatch(request("message/send", {"message": a2a_proto.text_message("x")}, id=i))
+        )["id"]
+        for i in range(3)
+    ]
+    assert list(tasks) == ids[1:]
+    with pytest.raises(JsonRpcError, match="unknown task"):
+        unwrap(rpc.dispatch(request("tasks/get", {"id": ids[0]}, id=9)))
+    assert unwrap(rpc.dispatch(request("tasks/get", {"id": ids[2]}, id=10)))["id"] == ids[2]
+
+
+def test_a2a_default_task_cap_is_500():
+    rpc, tasks = a2a_proto.build_server()
+    for i in range(501):
+        rpc.dispatch(request("message/send", {"message": a2a_proto.text_message("x")}, id=i))
+    assert len(tasks) == a2a_proto.MAX_TASKS == 500
+
+
+def test_a2a_rejects_oversized_body_with_413():
+    body = json.dumps(
+        request(
+            "message/send",
+            {"message": a2a_proto.text_message("x" * a2a_proto.MAX_BODY_BYTES)},
+            id=1,
+        )
+    ).encode("utf-8")
+    assert len(body) > a2a_proto.MAX_BODY_BYTES
+    with a2a_proto.running_server() as base_url:
+        req = Request(f"{base_url}/", data=body, headers={"Content-Type": "application/json"})
+        with pytest.raises(HTTPError) as excinfo:
+            urlopen(req, timeout=5)  # noqa: S310
+        assert excinfo.value.code == 413
+        # The server keeps serving normal-sized requests afterwards.
+        task = a2a_proto.A2AClient(base_url).send_message("Assess acme-logistics")
+    assert task["status"]["state"] == a2a_proto.TaskState.COMPLETED

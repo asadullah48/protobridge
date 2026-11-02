@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from typing import Any
 
@@ -334,10 +335,11 @@ def cmd_crm(args: argparse.Namespace) -> int:
 
 
 def cmd_serve_a2a(args: argparse.Namespace) -> int:
-    server = a2a_proto.make_server(args.host, args.port)
+    server = a2a_proto.make_server(args.host, args.port, args.public_url)
     host, port = server.server_address[0], server.server_address[1]
     print(f"protobridge A2A agent on http://{host}:{port}")
     print(f"  agent card: http://{host}:{port}{a2a_proto.AGENT_CARD_PATH}")
+    print(f"  public url: {server.RequestHandlerClass.card['url']}")
     print("  ctrl-c to stop")
     try:
         server.serve_forever()
@@ -400,6 +402,12 @@ def build_parser() -> argparse.ArgumentParser:
     serve_a2a = sub.add_parser("serve-a2a", help="run the reference A2A agent over HTTP")
     serve_a2a.add_argument("--host", default="127.0.0.1")
     serve_a2a.add_argument("--port", type=int, default=8931)
+    serve_a2a.add_argument(
+        "--public-url",
+        default=os.environ.get("PROTOBRIDGE_PUBLIC_URL"),
+        help="URL advertised in the Agent Card (env: PROTOBRIDGE_PUBLIC_URL; "
+        "default: http://{host}:{port}/)",
+    )
     serve_a2a.set_defaults(func=cmd_serve_a2a)
 
     return parser
