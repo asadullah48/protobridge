@@ -12,6 +12,29 @@ A local reference implementation using **synthetic data**, not a production prod
 
 [![ProtoBridge demo video](https://img.youtube.com/vi/fRyhCSqvunk/hqdefault.jpg)](https://youtu.be/fRyhCSqvunk)
 
+## Live demo
+
+The reference A2A agent runs at **https://84-12-146-32.sslip.io/**
+(Agent Card: [https://84-12-146-32.sslip.io/.well-known/agent-card.json](https://84-12-146-32.sslip.io/.well-known/agent-card.json)).
+
+This is **only the reference A2A peer**, the "Northwind Vendor Risk Agent", serving
+**synthetic data**. The full MCP + A2A bridge (governance graph, audit ledger) runs
+locally with `protobridge demo` (see [Run it](#run-it)).
+
+```bash
+curl -s -X POST https://84-12-146-32.sslip.io/ \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"message/send","params":{"message":{"role":"user","parts":[{"kind":"text","text":"Assess risk for globex-freight"}]},"metadata":{"skillId":"vendor.risk_assessment"}}}'
+```
+
+Expected: `result.status.state` is `"completed"`, and the artifact text contains
+`"vendor": "globex-freight"`, `"risk_score": 0.58`, `"tier": "medium"`.
+
+**Hosting:** Oracle Cloud Always Free (UAE East, Dubai), Docker, Caddy with
+Let's Encrypt HTTPS. Limits: 32 KB request body, 200 MB memory cap, 500-task store cap.
+
+**Limits:** the free hostname depends on the sslip.io service; free server, no uptime guarantee.
+
 ## Run it
 
 From the repo root, with [uv](https://docs.astral.sh/uv/) installed:
@@ -352,7 +375,7 @@ deterministic reasoner. It never breaks the bridge.
 
 ```bash
 uv sync --extra dev
-uv run pytest -q       # 65 tests passing (verified 24 Oct 2026, commit 3449d8d)
+uv run pytest -q       # 74 tests passing (verified 3 Nov 2026, commit 69cd28a)
 uv run ruff check .
 uv run ruff format .
 ```

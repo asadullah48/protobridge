@@ -18,6 +18,33 @@
 
 ---
 
+## العرض الحيّ
+
+يعمل وكيل A2A المرجعي على **https://84-12-146-32.sslip.io/**
+(بطاقة الوكيل: [https://84-12-146-32.sslip.io/.well-known/agent-card.json](https://84-12-146-32.sslip.io/.well-known/agent-card.json)).
+
+هذا **قرين A2A المرجعي فقط**، أي "Northwind Vendor Risk Agent"، ويقدّم **بيانات
+اصطناعية**. أمّا الجسر الكامل MCP + A2A (رسم الحوكمة ودفتر التدقيق) فيعمل محليًّا
+بالأمر `protobridge demo` (راجع [البدء السريع](#البدء-السريع)).
+
+```bash
+curl -s -X POST https://84-12-146-32.sslip.io/ \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"message/send","params":{"message":{"role":"user","parts":[{"kind":"text","text":"Assess risk for globex-freight"}]},"metadata":{"skillId":"vendor.risk_assessment"}}}'
+```
+
+النتيجة المتوقّعة: قيمة `result.status.state` هي `"completed"`، ونصّ الأثر (artifact)
+يحتوي على `"vendor": "globex-freight"` و`"risk_score": 0.58` و`"tier": "medium"`.
+
+**الاستضافة:** الطبقة المجانية الدائمة من Oracle Cloud (منطقة الإمارات الشرقية، دبي)،
+عبر Docker، وCaddy مع HTTPS من Let's Encrypt. الحدود: 32 كيلوبايت لجسم الطلب،
+وسقف ذاكرة 200 ميغابايت، وسقف 500 مهمّة في مخزن المهامّ.
+
+**القيود:** يعتمد اسم المضيف المجاني على خدمة sslip.io؛ والخادم مجاني بلا أيّ ضمان
+لوقت التشغيل.
+
+---
+
 ## لماذا يهمّ هذا المؤسسات؟
 
 معظم منصّات الوكلاء تختار بروتوكولًا واحدًا فتحبس نفسها فيه. أمّا التي تتبنّى
@@ -167,7 +194,7 @@ PROTOBRIDGE_LLM=ollama uv run protobridge demo
 ## التطوير
 
 ```bash
-uv run pytest          # 65 اختبارًا
+uv run pytest          # 74 اختبارًا ناجحًا (تم التحقّق في 3 نوفمبر 2026، الإيداع 69cd28a)
 uv run ruff check .
 uv run ruff format .
 ```
