@@ -31,7 +31,7 @@ Expected: `result.status.state` is `"completed"`, and the artifact text contains
 `"vendor": "globex-freight"`, `"risk_score": 0.58`, `"tier": "medium"`.
 
 **Hosting:** Oracle Cloud Always Free (UAE East, Dubai), Docker, Caddy with
-Let's Encrypt HTTPS. Limits: 32 KB request body, 200 MB memory cap, 500-task store cap.
+Let's Encrypt HTTPS. Limits: 32 KB request body, 500-task store cap.
 
 **Caveats:**
 
