@@ -40,8 +40,11 @@ curl -s -X POST https://84-12-146-32.sslip.io/ \
 عبر Docker، وCaddy مع HTTPS من Let's Encrypt. الحدود: 32 كيلوبايت لجسم الطلب،
 وسقف ذاكرة 200 ميغابايت، وسقف 500 مهمّة في مخزن المهامّ.
 
-**القيود:** يعتمد اسم المضيف المجاني على خدمة sslip.io؛ والخادم مجاني بلا أيّ ضمان
-لوقت التشغيل.
+**تنبيهات:**
+
+- يعتمد اسم المضيف المجاني على خدمة sslip.io؛ والخادم مجاني بلا أيّ ضمان لوقت التشغيل.
+- الطلبات التي لا تحمل الترويسة `Content-Length` (ترميز النقل المجزّأ chunked) تتلقّى
+  HTTP 400 عن قصد. بعض عملاء HTTP يرسلون طلبات مجزّأة افتراضيًا.
 
 ---
 
@@ -109,6 +112,7 @@ audit ledger
 | `protobridge tools` | يطبع كتالوج أدوات MCP المرجعي |
 | `protobridge serve-mcp` | يشغّل خادم MCP المرجعي على stdio |
 | `protobridge serve-a2a --port 8931` | يشغّل وكيل A2A المرجعي عبر HTTP |
+| `protobridge serve-a2a --public-url https://agent.example.com/` | الأمر نفسه مع إعلان هذا العنوان في الحقل `url` من بطاقة الوكيل. عند غيابه يُستخدَم متغيّر البيئة `PROTOBRIDGE_PUBLIC_URL` (الخيار يتقدّم إن وُجد الاثنان)، ثم العنوان المربوط `http://{host}:{port}/` |
 
 وجّه أيّ عميل MCP إلى `uv run protobridge serve-mcp`، أو اجلب بطاقة الوكيل:
 
@@ -194,7 +198,7 @@ PROTOBRIDGE_LLM=ollama uv run protobridge demo
 ## التطوير
 
 ```bash
-uv run pytest          # 74 اختبارًا ناجحًا (تم التحقّق في 3 نوفمبر 2026، الإيداع 69cd28a)
+uv run pytest          # 75 اختبارًا ناجحًا (تم التحقّق في 9 نوفمبر 2026)
 uv run ruff check .
 uv run ruff format .
 ```

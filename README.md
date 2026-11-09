@@ -33,7 +33,11 @@ Expected: `result.status.state` is `"completed"`, and the artifact text contains
 **Hosting:** Oracle Cloud Always Free (UAE East, Dubai), Docker, Caddy with
 Let's Encrypt HTTPS. Limits: 32 KB request body, 200 MB memory cap, 500-task store cap.
 
-**Limits:** the free hostname depends on the sslip.io service; free server, no uptime guarantee.
+**Caveats:**
+
+- The free hostname depends on the sslip.io service; free server, no uptime guarantee.
+- Requests without a `Content-Length` header (chunked transfer encoding) get HTTP 400 by
+  design. Some HTTP clients send chunked requests by default.
 
 ## Run it
 
@@ -230,6 +234,7 @@ audit ledger
 | `protobridge tools` | Prints the reference MCP tool catalogue |
 | `protobridge serve-mcp` | Runs the reference MCP server on stdio |
 | `protobridge serve-a2a --port 8931` | Runs the reference A2A agent over HTTP |
+| `protobridge serve-a2a --public-url https://agent.example.com/` | Same, advertising that URL as `url` in the Agent Card. Falls back to the `PROTOBRIDGE_PUBLIC_URL` env var (the flag wins if both are set), then to the bound `http://{host}:{port}/` |
 
 Point any MCP client at `uv run protobridge serve-mcp`, or `curl` the Agent Card:
 
@@ -375,7 +380,7 @@ deterministic reasoner. It never breaks the bridge.
 
 ```bash
 uv sync --extra dev
-uv run pytest -q       # 74 tests passing (verified 3 Nov 2026, commit 69cd28a)
+uv run pytest -q       # 75 tests passing (verified 9 Nov 2026)
 uv run ruff check .
 uv run ruff format .
 ```

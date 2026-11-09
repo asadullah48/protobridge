@@ -215,6 +215,7 @@ def build_server(
     """
     card = card or AGENT_CARD
     tasks: dict[str, dict[str, Any]] = {}
+    store_lock = threading.Lock()
     rpc = Dispatcher()
 
     def _transition(task: dict[str, Any], state: str, note: str | None = None) -> None:
@@ -241,9 +242,12 @@ def build_server(
             "metadata": metadata,
             "status": {"state": TaskState.SUBMITTED, "timestamp": _now_iso()},
         }
-        tasks[task_id] = task
-        while len(tasks) > max_tasks:
-            del tasks[next(iter(tasks))]  # dicts keep insertion order: oldest first
+        # ThreadingHTTPServer runs requests concurrently; evict before insert so
+        # the store never exceeds max_tasks, even to a reader outside the lock.
+        with store_lock:
+            while tasks and len(tasks) >= max_tasks:
+                tasks.pop(next(iter(tasks)), None)  # insertion order: oldest first
+            tasks[task_id] = task
 
         # Boundary policy: this agent belongs to another vendor and refuses
         # restricted material outright, regardless of what the caller claims.

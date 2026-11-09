@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import sys
+import threading
 from http.client import HTTPConnection
 from urllib.parse import urlsplit
 
@@ -224,6 +226,47 @@ def test_a2a_default_task_cap_is_500():
     for i in range(501):
         rpc.dispatch(request("message/send", {"message": a2a_proto.text_message("x")}, id=i))
     assert len(tasks) == a2a_proto.MAX_TASKS == 500
+
+
+def test_a2a_task_store_is_thread_safe_under_concurrent_sends():
+    cap, workers, sends = 5, 16, 200
+    rpc, tasks = a2a_proto.build_server(max_tasks=cap)
+    errors: list[BaseException] = []
+    sizes: list[int] = []
+    start = threading.Barrier(workers + 1)
+    done = threading.Event()
+
+    def send() -> None:
+        start.wait()
+        try:
+            for i in range(sends):
+                msg = request("message/send", {"message": a2a_proto.text_message("x")}, id=i)
+                unwrap(rpc.dispatch(msg))
+        except BaseException as exc:  # noqa: BLE001 - any error fails the test
+            errors.append(exc)
+
+    def watch() -> None:
+        start.wait()
+        while not done.is_set():
+            sizes.append(len(tasks))
+
+    old_interval = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)  # force frequent thread switches so races surface
+    try:
+        threads = [threading.Thread(target=send) for _ in range(workers)]
+        watcher = threading.Thread(target=watch)
+        for t in [*threads, watcher]:
+            t.start()
+        for t in threads:
+            t.join()
+        done.set()
+        watcher.join()
+    finally:
+        sys.setswitchinterval(old_interval)
+
+    assert errors == []
+    assert len(tasks) == cap
+    assert max(sizes) <= cap
 
 
 def _post_headers_only(base_url: str, content_length: str | None) -> tuple[int, dict, str | None]:
